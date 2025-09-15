@@ -21,6 +21,7 @@ import VerificationBadge from '../../components/common/ui/VerificationBadge';
 import VerificationRequestModal from '../../components/common/modals/VerificationRequestModal';
 import StoryViewer from '../../features/stories/StoryViewer';
 import { StoriesService } from '../../services/api/storiesService';
+import notificationService from '../../services/notificationService';
 import './Profile.css';
 
 export default function Profile({ profileUserId = null }) {
@@ -138,34 +139,34 @@ export default function Profile({ profileUserId = null }) {
     switch(userRole) {
       case 'athlete':
         return {
-          title: 'Talent Showcase',
-          description: 'Show your athletic skills and performances',
-          uploadLabel: 'Upload Performance Video',
-          emptyMessage: 'No performance videos uploaded yet',
+          title: t('talentShowcase'),
+          description: t('showAthleticSkills'),
+          uploadLabel: t('uploadVideo'),
+          emptyMessage: t('noPerformanceVideos'),
           icon: '🏆' // Trophy for athletes
         };
       case 'coach':
         return {
-          title: 'Coaching Portfolio',
-          description: 'Share your coaching techniques and training methods',
-          uploadLabel: 'Upload Coaching Video',
-          emptyMessage: 'No coaching videos uploaded yet',
+          title: t('coachingPortfolio'),
+          description: t('shareCoachingTechniques'),
+          uploadLabel: t('uploadVideo'),
+          emptyMessage: t('noCoachingVideos'),
           icon: '👨‍🏫' // Coach/teacher icon
         };
       case 'organisation':
         return {
-          title: 'Facility Showcase',
-          description: 'Highlight your facilities, events, and programs',
-          uploadLabel: 'Upload Facility Video',
-          emptyMessage: 'No facility videos uploaded yet',
+          title: t('facilityShowcase'),
+          description: t('highlightFacilities'),
+          uploadLabel: t('uploadVideo'),
+          emptyMessage: t('noFacilityVideos'),
           icon: '🏢' // Building for organizations
         };
       default:
         return {
-          title: 'Video Showcase',
-          description: 'Share your videos',
-          uploadLabel: 'Upload Video',
-          emptyMessage: 'No videos uploaded yet',
+          title: t('videoShowcase'),
+          description: t('shareYourVideos'),
+          uploadLabel: t('uploadVideo'),
+          emptyMessage: t('noVideosUploaded'),
           icon: '🎥' // Camera for general
         };
     }
@@ -177,7 +178,19 @@ export default function Profile({ profileUserId = null }) {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const profileData = docSnap.data();
-        setProfile(profileData);
+
+        // Calculate actual follower/following counts from follows collection
+        const followersCount = await getFollowersCount(targetUserId);
+        const followingCount = await getFollowingCount(targetUserId);
+
+        // Update profile with correct counts
+        const updatedProfileData = {
+          ...profileData,
+          followers: followersCount,
+          following: followingCount
+        };
+
+        setProfile(updatedProfileData);
         setCertificates(profileData.certificates || []);
         setAchievements(profileData.achievements || []);
         setSelectedSports(profileData.sports || []);
@@ -249,6 +262,34 @@ export default function Profile({ profileUserId = null }) {
       // Error fetching profile - logged in production
     }
     setLoading(false);
+  };
+
+  // Helper function to get followers count
+  const getFollowersCount = async (userId) => {
+    try {
+      const q = query(
+        collection(db, 'follows'),
+        where('followingId', '==', userId)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.size;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  // Helper function to get following count
+  const getFollowingCount = async (userId) => {
+    try {
+      const q = query(
+        collection(db, 'follows'),
+        where('followerId', '==', userId)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.size;
+    } catch (error) {
+      return 0;
+    }
   };
 
   const fetchUserPosts = async () => {
@@ -1187,7 +1228,20 @@ export default function Profile({ profileUserId = null }) {
           followingName: profile?.displayName || 'Anonymous User',
           timestamp: serverTimestamp()
         });
-        
+
+        // Send follow notification to the user being followed
+        try {
+          await notificationService.sendFollowNotification(
+            currentUser.uid,
+            currentUser.displayName || 'Someone',
+            currentUser.photoURL || '',
+            targetUserId
+          );
+        } catch (notificationError) {
+          console.error('Error sending follow notification:', notificationError);
+          // Don't fail the follow action if notification fails
+        }
+
         // Now following user - development debug removed for production
       }
     } catch (error) {
@@ -1261,13 +1315,27 @@ export default function Profile({ profileUserId = null }) {
           status: 'pending',
           timestamp: serverTimestamp()
         });
+
+        // Send friend request notification
+        try {
+          await notificationService.sendFriendRequestNotification(
+            currentUser.uid,
+            currentUser.displayName || 'Someone',
+            currentUser.photoURL || '',
+            targetUserId
+          );
+        } catch (notificationError) {
+          console.error('Error sending friend request notification:', notificationError);
+          // Don't fail the friend request if notification fails
+        }
+
         alert('Friend request sent!');
         // Refresh data after sending friend request
         fetchSentRequests();
-        
+
         // Trigger manual refresh of other components
-        window.dispatchEvent(new CustomEvent('friendshipChanged', { 
-          detail: { action: 'friend_request_sent', userId: targetUserId } 
+        window.dispatchEvent(new CustomEvent('friendshipChanged', {
+          detail: { action: 'friend_request_sent', userId: targetUserId }
         }));
       }
       
@@ -1345,7 +1413,7 @@ export default function Profile({ profileUserId = null }) {
   };
 
   if (loading) {
-    return <div className="loading">Loading profile...</div>;
+    return <div className="loading">{t('loadingProfile')}</div>;
   }
 
   // Guest profile view - minimal display with only guest ID
@@ -1365,10 +1433,10 @@ export default function Profile({ profileUserId = null }) {
                 />
               </div>
               <div className="guest-info">
-                <h1>Guest User</h1>
+                <h1>{t('guestUser')}</h1>
                 <div className="guest-limitation">
                   <p>🔒 Guest Account - Read Only Access</p>
-                  <p>Sign up to unlock full features!</p>
+                  <p>{t('signUpToUnlock')}</p>
                   <button 
                     className="sign-up-btn"
                     onClick={() => navigate('/login')}
@@ -1381,7 +1449,7 @@ export default function Profile({ profileUserId = null }) {
             
             <div className="guest-features">
               <div className="feature-card">
-                <h3>What you can do as a guest:</h3>
+                <h3>{t('whatYouCanDo')}</h3>
                 <ul>
                   <li>✅ View all posts</li>
                   <li>✅ Like posts</li>
@@ -1390,7 +1458,7 @@ export default function Profile({ profileUserId = null }) {
               </div>
               
               <div className="feature-card">
-                <h3>Sign up to unlock:</h3>
+                <h3>{t('signUpUnlock')}</h3>
                 <ul>
                   <li>📝 Create posts</li>
                   <li>💬 Comment on posts</li>
@@ -1429,12 +1497,12 @@ export default function Profile({ profileUserId = null }) {
                   {isOwnProfile ? (
                     <>
                       <Camera size={24} />
-                      <span>{uploading ? 'Uploading...' : 'Update Photo'}</span>
+                      <span>{uploading ? t('uploading') : t('updatePhoto')}</span>
                     </>
                   ) : (
                     <>
                       <Play size={24} />
-                      <span>View Stories</span>
+                      <span>{t('viewStories')}</span>
                     </>
                   )}
                 </div>
@@ -1464,7 +1532,7 @@ export default function Profile({ profileUserId = null }) {
               <div className="profile-image-menu">
                 <button className="menu-item" onClick={handleUpdateProfileImage}>
                   <Camera size={16} />
-                  Update Photo
+                  {t('updatePhoto')}
                 </button>
                 {profile?.photoURL && (
                   <button className="menu-item delete" onClick={handleDeleteProfileImage}>
@@ -1484,7 +1552,7 @@ export default function Profile({ profileUserId = null }) {
                   onClick={isEditing ? handleSaveProfile : handleEditProfile}
                 >
                   {isEditing ? <Save size={20} /> : <Edit2 size={20} />}
-                  {isEditing ? t('save_profile') : t('edit_profile')}
+                  {isEditing ? t('saveProfile') : t('editProfile')}
                 </button>
               )}
               {!isOwnProfile && !isGuest() && (
@@ -1515,12 +1583,12 @@ export default function Profile({ profileUserId = null }) {
                       
                       
                       if (isFriend) {
-                        return <><X size={20} /> Unfriend</>;
+                        return <><X size={20} /> {t('unfriend')}</>;
                       } else if (requestStatus === 'pending') {
-                        return <><X size={20} /> Cancel Request</>;
+                        return <><X size={20} /> {t('cancelRequest')}</>;
                       } else {
                         // Default case: not friends and no pending request = show Add Friend
-                        return <><UserPlus size={20} /> Add Friend</>;
+                        return <><UserPlus size={20} /> {t('addFriend')}</>;
                       }
                     })()}
                   </button>
@@ -1543,7 +1611,7 @@ export default function Profile({ profileUserId = null }) {
 
         {/* Personal Details Section */}
         <div className="profile-section">
-          <h2>{t('personal_details')}</h2>
+          <h2>{t('personalDetails')}</h2>
           <div className="details-grid">
             <div className="detail-item">
               <label>{t('name')}</label>
@@ -1572,26 +1640,26 @@ export default function Profile({ profileUserId = null }) {
               )}
             </div>
             <div className="detail-item">
-              <label>{t('height_cm')}</label>
+              <label>{t('heightCm')}</label>
               {isEditing ? (
                 <input 
                   type="number" 
                   value={editedProfile.height || ''} 
                   onChange={(e) => handleInputChange('height', e.target.value)}
-                  placeholder={t('height_cm')}
+                  placeholder={t('heightCm')}
                 />
               ) : (
                 <span>{profile?.height ? `${profile.height} cm` : 'Not specified'}</span>
               )}
             </div>
             <div className="detail-item">
-              <label>{t('weight_kg')}</label>
+              <label>{t('weightKg')}</label>
               {isEditing ? (
                 <input 
                   type="number" 
                   value={editedProfile.weight || ''} 
                   onChange={(e) => handleInputChange('weight', e.target.value)}
-                  placeholder={t('weight_kg')}
+                  placeholder={t('weightKg')}
                 />
               ) : (
                 <span>{profile?.weight ? `${profile.weight} kg` : 'Not specified'}</span>
@@ -1631,8 +1699,8 @@ export default function Profile({ profileUserId = null }) {
                   {(showSportsDropdown || editedProfile.role === 'athlete') && (
                     <div className="sports-selection-container">
                       <div className="sports-header">
-                        <label>Sports/Games</label>
-                        <span className="sports-help-text">Select the sports you play (max 5)</span>
+                        <label>{t('sportsGames')}</label>
+                        <span className="sports-help-text">{t('selectSports')}</span>
                       </div>
                       
                       {/* Selected Sports Display */}
@@ -1757,13 +1825,13 @@ export default function Profile({ profileUserId = null }) {
                   {(showCoachingForm || editedProfile.role === 'coach') && (
                     <div className="coaching-form-container">
                       <div className="coaching-header">
-                        <label>Coaching Profile</label>
-                        <span className="coaching-help-text">Complete your professional coaching information</span>
+                        <label>{t('coachingProfile')}</label>
+                        <span className="coaching-help-text">{t('completeCoaching')}</span>
                       </div>
 
                       {/* Organization Details */}
                       <div className="coaching-section">
-                        <h4>Organization & Position</h4>
+                        <h4>{t('organizationPosition')}</h4>
                         <div className="coaching-fields">
                           <input
                             type="text"
@@ -1777,7 +1845,7 @@ export default function Profile({ profileUserId = null }) {
                             onChange={(e) => handleCoachingInputChange('organizationType', e.target.value)}
                             className="coaching-select"
                           >
-                            <option value="">Select Organization Type</option>
+                            <option value="">{t('selectOrganizationType')}</option>
                             {ORGANIZATION_TYPES.map((type, index) => (
                               <option key={index} value={type}>{type}</option>
                             ))}
@@ -1787,7 +1855,7 @@ export default function Profile({ profileUserId = null }) {
                             onChange={(e) => handleCoachingInputChange('position', e.target.value)}
                             className="coaching-select"
                           >
-                            <option value="">Select Position</option>
+                            <option value="">{t('selectPosition')}</option>
                             {COACHING_LEVELS["Coaching Positions"].map((pos, index) => (
                               <option key={index} value={pos}>{pos}</option>
                             ))}
@@ -1797,7 +1865,7 @@ export default function Profile({ profileUserId = null }) {
                             onChange={(e) => handleCoachingInputChange('employmentType', e.target.value)}
                             className="coaching-select"
                           >
-                            <option value="">Employment Type</option>
+                            <option value="">{t('employmentType')}</option>
                             {EMPLOYMENT_TYPES.map((type, index) => (
                               <option key={index} value={type}>{type}</option>
                             ))}
@@ -1816,14 +1884,14 @@ export default function Profile({ profileUserId = null }) {
 
                       {/* Sports & Specializations */}
                       <div className="coaching-section">
-                        <h4>Sports & Specializations</h4>
+                        <h4>{t('sportsSpecializations')}</h4>
                         <div className="coaching-fields">
                           <select
                             value={coachingProfile.primarySport}
                             onChange={(e) => handleCoachingInputChange('primarySport', e.target.value)}
                             className="coaching-select"
                           >
-                            <option value="">Select Primary Sport</option>
+                            <option value="">{t('selectPrimarySport')}</option>
                             {searchSports('').map((sport, index) => (
                               <option key={index} value={sport}>{sport}</option>
                             ))}
@@ -1832,7 +1900,7 @@ export default function Profile({ profileUserId = null }) {
                           {/* Specializations based on selected sport */}
                           {coachingProfile.primarySport && (
                             <div className="specializations-section">
-                              <label>Specializations</label>
+                              <label>{t('specializations')}</label>
                               <div className="specializations-grid">
                                 {getSpecializationsBySport(coachingProfile.primarySport).map((spec, index) => (
                                   <button
@@ -1855,7 +1923,7 @@ export default function Profile({ profileUserId = null }) {
 
                           {/* Age Groups */}
                           <div className="age-groups-section">
-                            <label>Age Groups Coached</label>
+                            <label>{t('ageGroupsCoached')}</label>
                             {coachingProfile.ageGroups.length > 0 && (
                               <div className="selected-age-groups">
                                 {coachingProfile.ageGroups.map((ageGroup, index) => (
@@ -1881,7 +1949,7 @@ export default function Profile({ profileUserId = null }) {
                               }}
                               className="coaching-select"
                             >
-                              <option value="">Add Age Group</option>
+                              <option value="">{t('addAgeGroup')}</option>
                               {AGE_GROUPS.map((ageGroup, index) => (
                                 <option key={index} value={ageGroup}>{ageGroup}</option>
                               ))}
@@ -1892,14 +1960,14 @@ export default function Profile({ profileUserId = null }) {
 
                       {/* Credentials & Experience */}
                       <div className="coaching-section">
-                        <h4>Credentials & Experience</h4>
+                        <h4>{t('credentialsExperience')}</h4>
                         <div className="coaching-fields">
                           <select
                             value={coachingProfile.licenseLevel}
                             onChange={(e) => handleCoachingInputChange('licenseLevel', e.target.value)}
                             className="coaching-select"
                           >
-                            <option value="">Select License Level</option>
+                            <option value="">{t('selectLicenseLevel')}</option>
                             {COACHING_LEVELS["License Levels"].map((license, index) => (
                               <option key={index} value={license}>{license}</option>
                             ))}
@@ -1917,7 +1985,7 @@ export default function Profile({ profileUserId = null }) {
 
                           {/* Certifications */}
                           <div className="certifications-section">
-                            <label>Certifications</label>
+                            <label>{t('certifications')}</label>
                             <div className="certifications-list">
                               {coachingProfile.certifications.length > 0 && (
                                 <div className="selected-certifications">
@@ -1944,7 +2012,7 @@ export default function Profile({ profileUserId = null }) {
                                 }}
                                 className="coaching-select"
                               >
-                                <option value="">Add Certification</option>
+                                <option value="">{t('addCertification')}</option>
                                 {getAllCertifications().map((cert, index) => (
                                   <option key={index} value={cert}>{cert}</option>
                                 ))}
@@ -1956,7 +2024,7 @@ export default function Profile({ profileUserId = null }) {
 
                       {/* Philosophy Statement */}
                       <div className="coaching-section">
-                        <h4>Coaching Philosophy</h4>
+                        <h4>{t('coachingPhilosophy')}</h4>
                         <textarea
                           placeholder="Describe your coaching philosophy and approach..."
                           value={coachingProfile.philosophyStatement}
@@ -1983,18 +2051,18 @@ export default function Profile({ profileUserId = null }) {
         {!isEditing && (
           <div className="profile-section">
             <div className="section-header">
-              <h2>Role & Sports Information</h2>
+              <h2>{t('roleAndSports')}</h2>
             </div>
             
             <div className="role-sports-content">
               <div className="detail-item">
-                <label>Role</label>
+                <label>{t('role')}</label>
                 <span className="role-text">{t(profile?.role || 'athlete')}</span>
               </div>
               
               {profile?.sports && profile.sports.length > 0 && (
                 <div className="detail-item">
-                  <label>Sports</label>
+                  <label>{t('sports')}</label>
                   <div className="profile-sports-display">
                     {profile.sports.map((sport, index) => (
                       <span key={index} className="sport-tag display">{sport}</span>
@@ -2007,7 +2075,7 @@ export default function Profile({ profileUserId = null }) {
                 <div className="coaching-profile-display">
                   {profile.coachingProfile.organization && (
                     <div className="detail-item">
-                      <label>Organization</label>
+                      <label>{t('organization')}</label>
                       <div className="coaching-info-item">
                         <span className="coaching-value">{profile.coachingProfile.organization}</span>
                         {profile.coachingProfile.position && (
@@ -2019,28 +2087,28 @@ export default function Profile({ profileUserId = null }) {
                   
                   {profile.coachingProfile.primarySport && (
                     <div className="detail-item">
-                      <label>Primary Sport</label>
+                      <label>{t('primarySport')}</label>
                       <span className="coaching-value">{profile.coachingProfile.primarySport}</span>
                     </div>
                   )}
                   
                   {profile.coachingProfile.totalExperience && (
                     <div className="detail-item">
-                      <label>Experience</label>
+                      <label>{t('experience')}</label>
                       <span className="coaching-value">{profile.coachingProfile.totalExperience} years</span>
                     </div>
                   )}
                   
                   {profile.coachingProfile.licenseLevel && (
                     <div className="detail-item">
-                      <label>License Level</label>
+                      <label>{t('licenseLevel')}</label>
                       <span className="coaching-license">{profile.coachingProfile.licenseLevel}</span>
                     </div>
                   )}
                   
                   {profile.coachingProfile.specializations && profile.coachingProfile.specializations.length > 0 && (
                     <div className="detail-item">
-                      <label>Specializations</label>
+                      <label>{t('specializations')}</label>
                       <div className="specializations-tags">
                         {profile.coachingProfile.specializations.map((spec, index) => (
                           <span key={index} className="specialization-tag">{spec}</span>
@@ -2051,21 +2119,21 @@ export default function Profile({ profileUserId = null }) {
                   
                   {profile.coachingProfile.organizationType && (
                     <div className="detail-item">
-                      <label>Organization Type</label>
+                      <label>{t('organizationType')}</label>
                       <span className="coaching-value">{profile.coachingProfile.organizationType}</span>
                     </div>
                   )}
                   
                   {profile.coachingProfile.employmentType && (
                     <div className="detail-item">
-                      <label>Employment Type</label>
+                      <label>{t('employmentType')}</label>
                       <span className="coaching-value">{profile.coachingProfile.employmentType}</span>
                     </div>
                   )}
                   
                   {profile.coachingProfile.ageGroups && profile.coachingProfile.ageGroups.length > 0 && (
                     <div className="detail-item">
-                      <label>Age Groups Coached</label>
+                      <label>{t('ageGroups')}</label>
                       <div className="age-groups-tags">
                         {profile.coachingProfile.ageGroups.map((ageGroup, index) => (
                           <span key={index} className="age-group-tag">{ageGroup}</span>
@@ -2076,7 +2144,7 @@ export default function Profile({ profileUserId = null }) {
                   
                   {profile.coachingProfile.philosophyStatement && (
                     <div className="detail-item">
-                      <label>Coaching Philosophy</label>
+                      <label>{t('coachingPhilosophy')}</label>
                       <p className="coaching-philosophy">{profile.coachingProfile.philosophyStatement}</p>
                     </div>
                   )}
@@ -2196,7 +2264,7 @@ export default function Profile({ profileUserId = null }) {
               </div>
             ))}
             {certificates.length === 0 && (
-              <p className="empty-state">No certificates added yet</p>
+              <p className="empty-state">{t('noCertificates')}</p>
             )}
           </div>
         </div>
@@ -2270,7 +2338,7 @@ export default function Profile({ profileUserId = null }) {
               </div>
             ))}
             {achievements.length === 0 && (
-              <p className="empty-state">No achievements added yet</p>
+              <p className="empty-state">{t('noAchievements')}</p>
             )}
           </div>
         </div>
@@ -2368,7 +2436,7 @@ export default function Profile({ profileUserId = null }) {
                         <div className="status-badge rejected-container" title={`Rejected: ${video.rejectionReason || 'No reason provided'}`}>
                           <span className="rejected-badge">❌ REJECTED</span>
                           <div className="rejection-details">
-                            <p><strong>Reason:</strong> {video.rejectionReason || 'No reason provided'}</p>
+                            <p><strong>{t('reason')}</strong> {video.rejectionReason || t('noReasonProvided')}</p>
                             <p className="action-hint">💡 Delete and re-upload with corrections</p>
                           </div>
                         </div>
@@ -2421,7 +2489,7 @@ export default function Profile({ profileUserId = null }) {
         
         {/* Posts Grid */}
         <div className="profile-section">
-          <h2>Posts ({posts.filter(post => post.imageUrl || post.mediaUrl).length})</h2>
+          <h2>{t('posts')} ({posts.filter(post => post.imageUrl || post.mediaUrl).length})</h2>
           <div className="posts-grid">
             {posts.filter(post => post.imageUrl || post.mediaUrl).map((post) => (
               <div 
@@ -2468,7 +2536,7 @@ export default function Profile({ profileUserId = null }) {
               </div>
             ))}
             {posts.length === 0 && (
-              <p className="empty-state">No posts yet</p>
+              <p className="empty-state">{t('noPostsYet')}</p>
             )}
           </div>
         </div>
@@ -2479,7 +2547,7 @@ export default function Profile({ profileUserId = null }) {
         <div className="modal-overlay" onClick={() => setShowFollowersModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3><Users size={20} /> Followers ({followers.length})</h3>
+              <h3><Users size={20} /> {t('followers')} ({followers.length})</h3>
               <button onClick={() => setShowFollowersModal(false)}>
                 <X size={20} />
               </button>
@@ -2488,7 +2556,7 @@ export default function Profile({ profileUserId = null }) {
               {followers.length === 0 ? (
                 <div className="empty-modal">
                   <Users size={48} />
-                  <p>No followers yet</p>
+                  <p>{t('noFollowersYet')}</p>
                 </div>
               ) : (
                 <div className="users-list">
@@ -2522,7 +2590,7 @@ export default function Profile({ profileUserId = null }) {
         <div className="modal-overlay" onClick={() => setShowFollowingModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3><UserPlus size={20} /> Following ({following.length})</h3>
+              <h3><UserPlus size={20} /> {t('following')} ({following.length})</h3>
               <button onClick={() => setShowFollowingModal(false)}>
                 <X size={20} />
               </button>
@@ -2531,7 +2599,7 @@ export default function Profile({ profileUserId = null }) {
               {following.length === 0 ? (
                 <div className="empty-modal">
                   <UserPlus size={48} />
-                  <p>Not following anyone yet</p>
+                  <p>{t('notFollowingAnyone')}</p>
                 </div>
               ) : (
                 <div className="users-list">
@@ -2582,9 +2650,9 @@ export default function Profile({ profileUserId = null }) {
               {/* Video Info and Actions */}
               <div className="video-modal-info">
                 <div className="video-description">
-                  <strong>Uploaded by:</strong> {playingVideo.userDisplayName || 'Unknown User'}
+                  <strong>{t('uploadedBy')}</strong> {playingVideo.userDisplayName || t('unknownUser')}
                   {playingVideo.isSample && (
-                    <span className="sample-badge">Sample Video</span>
+                    <span className="sample-badge">{t('sampleVideo')}</span>
                   )}
                 </div>
                 
@@ -2645,10 +2713,10 @@ export default function Profile({ profileUserId = null }) {
                 
                 {/* Comments Section */}
                 <div className="video-comments-section">
-                  <h4>Comments ({(playingVideo.comments || []).length})</h4>
+                  <h4>{t('comments')} ({(playingVideo.comments || []).length})</h4>
                   <div className="video-comments-list">
                     {(playingVideo.comments || []).length === 0 ? (
-                      <p className="no-comments">No comments yet. Be the first to comment!</p>
+                      <p className="no-comments">{t('noCommentsYet')}</p>
                     ) : (
                       (playingVideo.comments || []).map((comment, index) => (
                         <div key={index} className="video-comment">
@@ -2704,7 +2772,7 @@ export default function Profile({ profileUserId = null }) {
                     </form>
                   ) : (
                     <div className="guest-comment-message">
-                      <span>Sign in to comment on videos</span>
+                      <span>{t('signInToComment')}</span>
                     </div>
                   )}
                 </div>

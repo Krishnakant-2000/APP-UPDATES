@@ -95,7 +95,14 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    return signOut(auth);
+    return signOut(auth).then(() => {
+      // Clear remembered credentials on explicit logout
+      localStorage.removeItem('rememberedEmail');
+      localStorage.removeItem('rememberMe');
+
+      // Redirect to login page with logout parameter
+      window.location.href = '/login?logout=yes';
+    });
   }
 
   async function updateUserProfile(profileData) {

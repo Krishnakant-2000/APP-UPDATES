@@ -116,10 +116,10 @@ export const LoginPageScreen = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
       {/* Back Button - Upper Left */}
-      <button 
+      <button
         className="fixed top-4 left-4 z-50 bg-black bg-opacity-50 text-white px-3 py-2 rounded-lg hover:bg-opacity-70 transition-all duration-200 flex items-center gap-2"
-        onClick={() => navigate('/app')}
-        title="Go back to App"
+        onClick={() => navigate('/landing')}
+        title="Go to Landing Page"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="m15 18-6-6 6-6"/>
@@ -278,3 +278,5 @@ export const LoginPageScreen = () => {
     </div>
   );
 };
+
+export default LoginPageScreen;

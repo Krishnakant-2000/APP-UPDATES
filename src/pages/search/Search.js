@@ -30,6 +30,10 @@ export default function Search() {
     sex: '',
     age: ''
   });
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownSuggestions, setDropdownSuggestions] = useState([]);
 
   const fetchSentRequests = useCallback(() => {
     const q = query(
@@ -254,6 +258,69 @@ export default function Search() {
     setFollowingUser(null);
   };
 
+  // Fetch random suggested users
+  const fetchRandomUsers = useCallback(async () => {
+    if (isGuest()) return;
+
+    setLoadingSuggestions(true);
+
+    try {
+      const allUsersSnapshot = await getDocs(collection(db, 'users'));
+      const allUsers = [];
+
+      allUsersSnapshot.forEach((doc) => {
+        const userData = { id: doc.id, ...doc.data() };
+        // Exclude current user
+        if (doc.id !== currentUser.uid) {
+          allUsers.push(userData);
+        }
+      });
+
+      // Shuffle and take first 8 random users
+      const shuffled = allUsers.sort(() => 0.5 - Math.random());
+      const randomUsers = shuffled.slice(0, 8);
+
+      setSuggestedUsers(randomUsers);
+    } catch (error) {
+      console.error('Error fetching random users:', error);
+    }
+
+    setLoadingSuggestions(false);
+  }, [currentUser, isGuest]);
+
+  // Load suggested users on component mount
+  useEffect(() => {
+    if (currentUser && !isGuest()) {
+      fetchRandomUsers();
+    }
+  }, [currentUser, isGuest, fetchRandomUsers]);
+
+  // Fetch dropdown suggestions when search input is focused
+  const fetchDropdownSuggestions = useCallback(async () => {
+    if (isGuest()) return;
+
+    try {
+      const allUsersSnapshot = await getDocs(collection(db, 'users'));
+      const allUsers = [];
+
+      allUsersSnapshot.forEach((doc) => {
+        const userData = { id: doc.id, ...doc.data() };
+        // Exclude current user
+        if (doc.id !== currentUser.uid) {
+          allUsers.push(userData);
+        }
+      });
+
+      // Shuffle and take first 5 for dropdown
+      const shuffled = allUsers.sort(() => 0.5 - Math.random());
+      const randomDropdownUsers = shuffled.slice(0, 5);
+
+      setDropdownSuggestions(randomDropdownUsers);
+    } catch (error) {
+      console.error('Error fetching dropdown suggestions:', error);
+    }
+  }, [currentUser, isGuest]);
+
   const handleSearch = async () => {
     if (isGuest()) {
       return;
@@ -437,6 +504,83 @@ export default function Search() {
     setSearchResults([]);
   };
 
+  // Function to get user initials
+  const getUserInitials = (displayName, email) => {
+    if (displayName && displayName.trim()) {
+      return displayName.trim().charAt(0).toUpperCase();
+    }
+    if (email && email.trim()) {
+      return email.trim().charAt(0).toUpperCase();
+    }
+    return '?';
+  };
+
+  // Function to render user avatar with fallback
+  const renderUserAvatar = (user, size = 'normal') => {
+    const initials = getUserInitials(user.displayName, user.email);
+
+    if (user.photoURL) {
+      return (
+        <img
+          src={user.photoURL}
+          alt={user.displayName || 'User'}
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }}
+        />
+      );
+    }
+
+    return (
+      <div className="avatar-initials">
+        {initials}
+      </div>
+    );
+  };
+
+  // Handle search input focus - only show dropdown if there's text
+  const handleSearchFocus = () => {
+    if (!isGuest() && searchTerm.trim().length > 0) {
+      setShowDropdown(true);
+      if (dropdownSuggestions.length === 0) {
+        fetchDropdownSuggestions();
+      }
+    }
+  };
+
+  // Handle search input blur (with delay to allow clicks)
+  const handleSearchBlur = () => {
+    setTimeout(() => {
+      setShowDropdown(false);
+    }, 200);
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (user) => {
+    setSearchTerm(user.displayName || user.email || '');
+    setShowDropdown(false);
+    // Trigger search with the selected user
+    setTimeout(() => {
+      handleSearch();
+    }, 100);
+  };
+
+  // Handle search input change
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    // Show dropdown when user starts typing (at least 1 character)
+    if (!isGuest() && value.trim().length > 0) {
+      setShowDropdown(true);
+      if (dropdownSuggestions.length === 0) {
+        fetchDropdownSuggestions();
+      }
+    } else {
+      setShowDropdown(false);
+    }
+  };
 
   const hasActiveFilters = Object.values(filters).some(filter => filter.trim().length > 0) || searchTerm.trim().length > 0;
 
@@ -476,23 +620,73 @@ export default function Search() {
         <div className="search-bar">
           <div className="search-input-container">
             <SearchIcon size={20} />
-            <input
-              type="text"
-              placeholder="Search users by name, email, or display name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
-            />
-            <button 
+            <div className="search-input-wrapper">
+              <input
+                type="text"
+                placeholder="Search users by name, email, or display name..."
+                value={searchTerm}
+                onChange={handleSearchInputChange}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setShowDropdown(false);
+                    handleSearch();
+                  }
+                  if (e.key === 'Escape') {
+                    setShowDropdown(false);
+                  }
+                }}
+              />
+
+              {/* Dropdown Suggestions */}
+              {showDropdown && dropdownSuggestions.length > 0 && (
+                <div className="search-dropdown">
+                  <div className="dropdown-header">
+                    <span>Suggested users</span>
+                  </div>
+                  {dropdownSuggestions.map((user) => (
+                    <div
+                      key={user.id}
+                      className="dropdown-suggestion"
+                      onClick={() => handleSuggestionClick(user)}
+                    >
+                      <div className="suggestion-avatar">
+                        {user.photoURL ? (
+                          <>
+                            <img
+                              src={user.photoURL}
+                              alt={user.displayName || 'User'}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                            <div className="avatar-initials dropdown-initials" style={{ display: 'none' }}>
+                              {getUserInitials(user.displayName, user.email)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="avatar-initials dropdown-initials">
+                            {getUserInitials(user.displayName, user.email)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="suggestion-info">
+                        <span className="suggestion-name">{user.displayName || 'Anonymous User'}</span>
+                        {user.role && <span className="suggestion-role">{user.role}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
               className="filter-toggle-btn"
               onClick={() => setShowFilters(!showFilters)}
             >
               <Filter size={16} />
-              Filters
             </button>
             <button onClick={handleSearch} disabled={loading}>
               {loading ? 'Searching...' : 'Search'}
@@ -604,7 +798,101 @@ export default function Search() {
             </div>
           </div>
         )}
-        
+
+        {/* Suggested Users Section */}
+        {!searchTerm && !hasActiveFilters && suggestedUsers.length > 0 && (
+          <div className="suggested-users-section">
+            <div className="suggested-header">
+              <h3>Suggested for you</h3>
+              <button onClick={fetchRandomUsers} disabled={loadingSuggestions}>
+                {loadingSuggestions ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+            <div className="suggested-users-grid">
+              {suggestedUsers.map((user) => {
+                const requestStatus = getRequestStatus(user.id);
+                const isFriend = isAlreadyFriend(user.id);
+                const isFollowing = followedUsers.includes(user.id);
+                const isProcessing = followingUser === user.id;
+
+                return (
+                  <div key={user.id} className="suggested-user-card">
+                    <div className="suggested-user-avatar" onClick={() => navigate(`/profile/${user.id}`)}>
+                      {user.photoURL ? (
+                        <>
+                          <img
+                            src={user.photoURL}
+                            alt={user.displayName || 'User'}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                          <div className="avatar-initials" style={{ display: 'none' }}>
+                            {getUserInitials(user.displayName, user.email)}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="avatar-initials">
+                          {getUserInitials(user.displayName, user.email)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="suggested-user-info" onClick={() => navigate(`/profile/${user.id}`)}>
+                      <h4>{user.displayName || 'Anonymous User'}</h4>
+                      {user.role && <span className="user-role-badge">{user.role}</span>}
+                      {user.location && <span className="user-location-badge">{user.location}</span>}
+                    </div>
+                    <div className="suggested-user-actions">
+                      {(() => {
+                        if (isFriend) {
+                          return (
+                            <button className="friend-btn small" disabled>
+                              <Check size={14} />
+                              Friends
+                            </button>
+                          );
+                        } else if (requestStatus === 'pending') {
+                          return (
+                            <button
+                              className="cancel-btn small"
+                              onClick={() => handleSendFriendRequest(user.id, user.displayName, user.photoURL)}
+                            >
+                              <X size={14} />
+                              Cancel
+                            </button>
+                          );
+                        } else {
+                          return (
+                            <button
+                              className="add-friend-btn small"
+                              onClick={() => handleSendFriendRequest(user.id, user.displayName, user.photoURL)}
+                            >
+                              <UserPlus size={14} />
+                              Add Friend
+                            </button>
+                          );
+                        }
+                      })()}
+
+                      <button
+                        className={`follow-btn small ${isFollowing ? 'following' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFollow(user.id, user.displayName || 'Anonymous User');
+                        }}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? '...' : (isFollowing ? 'Unfollow' : 'Follow')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="search-results">
           {searchTerm && searchTerm.trim().length > 0 && searchTerm.trim().length < 2 && (
             <div className="search-placeholder">
@@ -622,13 +910,6 @@ export default function Search() {
             </div>
           )}
           
-          {searchResults.length === 0 && !searchTerm && (
-            <div className="search-placeholder">
-              <SearchIcon size={48} />
-              <h3>Find Friends</h3>
-              <p>Start typing to search for users and send friend requests</p>
-            </div>
-          )}
           
           {searchResults.map((user) => {
             const requestStatus = getRequestStatus(user.id);
@@ -639,10 +920,25 @@ export default function Search() {
             return (
               <div key={user.id} className="user-result">
                 <div className="user-avatar" onClick={() => navigate(`/profile/${user.id}`)}>
-                  <img 
-                    src={user.photoURL || 'https://via.placeholder.com/50/2d3748/00ff88?text=👤'} 
-                    alt={user.displayName}
-                  />
+                  {user.photoURL ? (
+                    <>
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName || 'User'}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div className="avatar-initials search-avatar-initials" style={{ display: 'none' }}>
+                        {getUserInitials(user.displayName, user.email)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="avatar-initials search-avatar-initials">
+                      {getUserInitials(user.displayName, user.email)}
+                    </div>
+                  )}
                 </div>
                 <div className="user-info" onClick={() => navigate(`/profile/${user.id}`)}>
                   <strong>{user.displayName || 'Anonymous User'}</strong>

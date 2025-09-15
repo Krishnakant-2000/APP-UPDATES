@@ -55,6 +55,50 @@
   color: #007bff;
 }
 
+/* Notification Bell Styles */
+.notification-bell {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.notification-bell:hover {
+  transform: scale(1.1);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .profile-pic-nav {
   cursor: pointer;
   transition: transform 0.2s ease;
@@ -1054,7 +1098,7 @@
 
 .add-post-header h2 {
   margin: 0;
-  color: rgba(0, 0, 0, 0.9);
+  color: rgba(255, 255, 255, 0.9);
   font-size: 20px;
   font-weight: 600;
 }
@@ -1096,13 +1140,13 @@
 
 .username {
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.9);
+  color: rgba(255, 255, 255, 0.9);
   font-size: 16px;
 }
 
 .post-visibility {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .post-caption-input {
@@ -1112,7 +1156,7 @@
   border-radius: 8px;
   padding: 12px 16px;
   font-size: 16px;
-  color: rgba(0, 0, 0, 0.9);
+  color: rgba(255, 255, 255, 0.9);
   resize: none;
   min-height: 48px;
   max-height: 200px;
@@ -1123,7 +1167,7 @@
 }
 
 .post-caption-input::placeholder {
-  color: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .post-caption-input:focus {
@@ -1183,7 +1227,7 @@
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
-  color: rgba(0, 0, 0, 0.8);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 13px;
   font-weight: 500;
   transition: all 0.3s ease;
@@ -1215,7 +1259,7 @@
 
 .post-submit-btn:disabled {
   background: rgba(128, 128, 128, 0.3);
-  color: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.5);
   cursor: not-allowed;
   transform: none;
 }

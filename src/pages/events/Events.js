@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from 'react-router-dom';
 import FooterNav from '../../components/layout/FooterNav';
 import AppHeader from '../../components/layout/AppHeader';
 import "./Events.css";
@@ -24,6 +25,26 @@ import rectangle104 from './images/Rectangle 104.png';
 import rectangle105 from './images/Rectangle 105.png';
 
 export default function Events() {
+    const navigate = useNavigate();
+    const [activeFilter, setActiveFilter] = React.useState('ALL');
+
+    // Handle About Us click
+    const handleAboutUsClick = () => {
+        navigate('/about');
+    };
+
+    // Handle Register Now click
+    const handleRegisterClick = (eventName) => {
+        // For now, just show alert - you can modify this later
+        alert(`Registration for ${eventName} will be available soon!`);
+    };
+
+    // Handle filter button click
+    const handleFilterClick = (filterName) => {
+        setActiveFilter(filterName);
+        console.log(`Filter changed to: ${filterName}`);
+        // You can add filtering logic here later
+    };
 
     return (
         <div className="event-page">
@@ -40,11 +61,9 @@ export default function Events() {
                     <div className="text-wrapper-2">Sports Event</div>
 
                     <div className="frame">
-                        <div className="text-wrapper-3">Home</div>
-
-                        <div className="text-wrapper-3">Event</div>
-
-                        <div className="text-wrapper-3">About us</div>
+                        <div className="text-wrapper-3 clickable" onClick={handleAboutUsClick}>
+                            About us
+                        </div>
                     </div>
 
                 </div>
@@ -59,23 +78,23 @@ export default function Events() {
                 </p>
 
                 <div className="frame-2">
-                    <div className="div-wrapper">
+                    <div className={`div-wrapper filter-btn ${activeFilter === 'ALL' ? 'active' : ''}`} onClick={() => handleFilterClick('ALL')}>
                         <div className="text-wrapper-5">ALL</div>
                     </div>
 
-                    <div className="frame-3">
+                    <div className={`frame-3 filter-btn ${activeFilter === 'Cricket' ? 'active' : ''}`} onClick={() => handleFilterClick('Cricket')}>
                         <div className="text-wrapper-6">Cricket</div>
                     </div>
 
-                    <div className="frame-3">
-                        <div className="text-wrapper-7">Athelete</div>
+                    <div className={`frame-3 filter-btn ${activeFilter === 'Athlete' ? 'active' : ''}`} onClick={() => handleFilterClick('Athlete')}>
+                        <div className="text-wrapper-7">Athlete</div>
                     </div>
 
-                    <div className="frame-4">
+                    <div className={`frame-4 filter-btn ${activeFilter === 'Badminton' ? 'active' : ''}`} onClick={() => handleFilterClick('Badminton')}>
                         <div className="text-wrapper-8">Badminton</div>
                     </div>
 
-                    <div className="frame-5">
+                    <div className={`frame-5 filter-btn ${activeFilter === 'More' ? 'active' : ''}`} onClick={() => handleFilterClick('More')}>
                         <div className="text-wrapper-9">More</div>
                     </div>
                 </div>
@@ -155,7 +174,7 @@ export default function Events() {
 
                     <img className="rectangle-7" alt="3rd Prize" src={rectangle103} />
 
-                    <div className="frame-9">
+                    <div className="frame-9 clickable" onClick={() => handleRegisterClick('Weekend Cricket Championship')}>
                         <div className="text-wrapper-14">Register Now</div>
                     </div>
                 </div>
@@ -231,7 +250,7 @@ export default function Events() {
 
                     <img className="rectangle-13" alt="3rd Prize" src={rectangle103} />
 
-                    <div className="frame-12">
+                    <div className="frame-12 clickable" onClick={() => handleRegisterClick('100 Meter Running Challenge')}>
                         <div className="text-wrapper-14">Register Now</div>
                     </div>
 
