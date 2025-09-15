@@ -10,6 +10,101 @@
     padding: 0;
 }
 
+/* Clickable styles for interactive elements */
+.clickable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.clickable:hover {
+    transform: scale(1.05);
+    opacity: 0.8;
+}
+
+/* About Us button specific styling */
+.text-wrapper-3.clickable {
+    color: #007bff;
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+.text-wrapper-3.clickable:hover {
+    color: #0056b3;
+    text-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+/* Register Now button specific styling */
+.frame-9.clickable,
+.frame-12.clickable {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.frame-9.clickable:hover,
+.frame-12.clickable:hover {
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+    box-shadow: 0 6px 12px rgba(0, 123, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.frame-9.clickable .text-wrapper-14,
+.frame-12.clickable .text-wrapper-14 {
+    color: white;
+    font-weight: 600;
+}
+
+/* Filter Button Styles */
+.filter-btn {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 20px;
+    padding: 8px 16px;
+    margin: 0 4px;
+    border: 2px solid transparent;
+}
+
+.filter-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+}
+
+/* Active filter button */
+.filter-btn.active {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border: 2px solid #007bff;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.filter-btn.active .text-wrapper-5,
+.filter-btn.active .text-wrapper-6,
+.filter-btn.active .text-wrapper-7,
+.filter-btn.active .text-wrapper-8,
+.filter-btn.active .text-wrapper-9 {
+    color: white !important;
+    font-weight: 600;
+}
+
+/* Inactive filter button */
+.filter-btn:not(.active) {
+    background: rgba(0, 123, 255, 0.1);
+    border: 2px solid rgba(0, 123, 255, 0.3);
+}
+
+.filter-btn:not(.active):hover {
+    background: rgba(0, 123, 255, 0.2);
+    border: 2px solid rgba(0, 123, 255, 0.5);
+}
+
+.filter-btn:not(.active) .text-wrapper-5,
+.filter-btn:not(.active) .text-wrapper-6,
+.filter-btn:not(.active) .text-wrapper-7,
+.filter-btn:not(.active) .text-wrapper-8,
+.filter-btn:not(.active) .text-wrapper-9 {
+    color: #007bff;
+    font-weight: 500;
+}
+
 .event-page .div {
     background-color: #ffffff;
     height: 1106px;
@@ -80,7 +175,7 @@
     font-family: "Teachers-SemiBold", Helvetica, Arial, sans-serif;
     font-size: 20px;
     font-weight: 600;
-    left: 38px;
+    left: 5px;
     letter-spacing: 0;
     line-height: normal;
     position: absolute;

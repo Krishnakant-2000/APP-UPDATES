@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import PrivateRoute from './features/auth/PrivateRoute';
+import AuthRedirect from './components/auth/AuthRedirect';
 import NetworkStatus from './components/common/NetworkStatus';
 import CacheProvider from './components/common/cache/CacheProvider';
 import { registerSW } from './utils/serviceWorkerRegistration';
@@ -21,7 +22,7 @@ import './performance.css';
 // Lazy load components for better performance
 const NewLanding = React.lazy(() => import('./pages/newlanding/NewLanding'));
 const Login = React.lazy(() => import('./components/login/NewLoginFlow'));
-const Signup = React.lazy(() => import('./features/auth/Signup'));
+const Signup = React.lazy(() => import('./features/auth/EnhancedSignup'));
 const Home = React.lazy(() => import('./pages/home/Home'));
 const Profile = React.lazy(() => import('./pages/profile/Profile'));
 const Search = React.lazy(() => import('./pages/search/Search'));
@@ -91,8 +92,10 @@ function AppContent() {
       <NetworkStatus />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
-              <Route path="/" element={<NewLanding />} />
+              <Route path="/" element={<Login />} />
+              <Route path="/landing" element={<NewLanding />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/profile-select" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/home" element={
                 <PrivateRoute>
@@ -167,7 +170,9 @@ function App() {
             <LanguageProvider>
               <AuthProvider>
                 <SettingsProvider>
-                  <AppContent />
+                  <AuthRedirect>
+                    <AppContent />
+                  </AuthRedirect>
                 </SettingsProvider>
               </AuthProvider>
             </LanguageProvider>

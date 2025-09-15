@@ -1,29 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  orderBy,
   onSnapshot,
   serverTimestamp,
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
-import { X, Send, MessageCircle, Heart } from 'lucide-react';
+import { X, Send, MessageCircle, Heart, Edit2, Trash2, Check, XIcon } from 'lucide-react';
 import './CommentDrawer.css';
 
-const CommentDrawer = ({ isOpen, onClose, postId, postAuthor }) => {
+const CommentDrawer = ({ isOpen, onClose, postId, postAuthor, onCommentAdded }) => {
   const { currentUser } = useAuth();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingComment, setEditingComment] = useState(null);
+  const [editText, setEditText] = useState('');
   const commentInputRef = useRef(null);
   const commentsEndRef = useRef(null);
 
@@ -113,7 +116,12 @@ const CommentDrawer = ({ isOpen, onClose, postId, postAuthor }) => {
       });
 
       setNewComment('');
-      
+
+      // Notify parent component about new comment
+      if (onCommentAdded) {
+        onCommentAdded(postId);
+      }
+
       // Notify post author if it's not their own comment
       if (currentUser.uid !== postAuthor?.userId) {
         try {
@@ -172,6 +180,58 @@ const CommentDrawer = ({ isOpen, onClose, postId, postAuthor }) => {
       }
     } catch (error) {
       console.error('Error liking comment:', error);
+    }
+  };
+
+  // Handle edit comment
+  const handleEditComment = (comment) => {
+    setEditingComment(comment.id);
+    setEditText(comment.text);
+  };
+
+  // Handle save edited comment
+  const handleSaveEdit = async (commentId) => {
+    if (!editText.trim()) return;
+
+    try {
+      const commentRef = doc(db, 'comments', commentId);
+      await updateDoc(commentRef, {
+        text: editText.trim(),
+        editedAt: serverTimestamp()
+      });
+
+      setEditingComment(null);
+      setEditText('');
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert('Failed to update comment. Please try again.');
+    }
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    const originalComment = comments.find(c => c.id === editingComment);
+    if (originalComment && editText !== originalComment.text && editText.trim() !== '') {
+      if (window.confirm('Are you sure you want to cancel? Your changes will be lost.')) {
+        setEditingComment(null);
+        setEditText('');
+      }
+    } else {
+      setEditingComment(null);
+      setEditText('');
+    }
+  };
+
+  // Handle delete comment
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const commentRef = doc(db, 'comments', commentId);
+      await deleteDoc(commentRef);
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment. Please try again.');
     }
   };
 
@@ -273,16 +333,61 @@ const CommentDrawer = ({ isOpen, onClose, postId, postAuthor }) => {
                     </div>
                     
                     <div className="comment-text">
-                      {comment.text}
+                      {editingComment === comment.id ? (
+                        <div className="comment-edit-container">
+                          <textarea
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            className="comment-edit-input"
+                            autoFocus
+                            rows={2}
+                            onKeyPress={(e) => {
+                              // Only handle keyboard shortcuts on desktop
+                              if (window.innerWidth > 768) {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleSaveEdit(comment.id);
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEdit();
+                                }
+                              }
+                            }}
+                            placeholder="Edit your comment..."
+                          />
+                          <div className="comment-edit-actions">
+                            <button
+                              className="save-edit-btn"
+                              onClick={() => handleSaveEdit(comment.id)}
+                            >
+                              <Check size={14} />
+                              <span>Save</span>
+                            </button>
+                            <button
+                              className="cancel-edit-btn"
+                              onClick={handleCancelEdit}
+                            >
+                              <X size={14} />
+                              <span>Cancel</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {comment.text}
+                          {comment.editedAt && (
+                            <span className="edited-indicator">(edited)</span>
+                          )}
+                        </>
+                      )}
                     </div>
-                    
+
                     <div className="comment-actions">
-                      <button 
+                      <button
                         className={`comment-like-btn ${comment.likes?.includes(currentUser?.uid) ? 'liked' : ''}`}
                         onClick={() => handleLikeComment(comment.id)}
                       >
-                        <Heart 
-                          size={14} 
+                        <Heart
+                          size={14}
                           fill={comment.likes?.includes(currentUser?.uid) ? '#ef4444' : 'none'}
                           color={comment.likes?.includes(currentUser?.uid) ? '#ef4444' : 'currentColor'}
                         />
@@ -290,6 +395,24 @@ const CommentDrawer = ({ isOpen, onClose, postId, postAuthor }) => {
                           <span>{comment.likesCount}</span>
                         )}
                       </button>
+
+                      {/* Edit/Delete buttons for comment author */}
+                      {currentUser && comment.userId === currentUser.uid && editingComment !== comment.id && (
+                        <>
+                          <button
+                            className="comment-edit-btn"
+                            onClick={() => handleEditComment(comment)}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="comment-delete-btn"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

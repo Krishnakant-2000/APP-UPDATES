@@ -159,21 +159,58 @@ const NewLoginFlow = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('type'); // 'type', 'details', 'login'
+  const [logoutMessage, setLogoutMessage] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [userType, setUserType] = useState(null);
   const [searchParams] = useSearchParams();
   const { login, guestLogin, googleLogin, facebookLogin, appleLogin } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  // Check for user type in URL params
+  // Load saved credentials if "Remember Me" was used
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    const savedRememberMe = localStorage.getItem('rememberMe') === 'true';
+
+    if (savedEmail && savedRememberMe) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
+  // Check for user type in URL params and logout parameter
   useEffect(() => {
     const type = searchParams.get('type');
+    const isLogout = searchParams.get('logout') === 'yes';
+
+    // If user just logged out, show login form directly with smooth transition
+    if (isLogout) {
+      setError('');
+      setLogoutMessage('✅ Successfully logged out! Please sign in again.');
+
+      // Set state immediately for smooth transition
+      setStep('login');
+      setUserType('returning-user');
+      console.log('✅ User successfully logged out - showing login form');
+
+      // Clear the logout parameter from URL after a smooth delay
+      setTimeout(() => {
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('logout');
+        const newUrl = newSearchParams.toString() ? `/login?${newSearchParams.toString()}` : '/login';
+        window.history.replaceState({}, '', newUrl);
+
+        // Clear the logout message after 4 seconds (longer for better UX)
+        setTimeout(() => setLogoutMessage(''), 4000);
+      }, 100); // Reduced delay for smoother transition
+    }
+
     if (type && ['athlete', 'coach', 'organization'].includes(type)) {
       setUserType(type);
       const fromExplore = searchParams.get('fromExplore') === 'true';
       setStep(fromExplore ? 'login' : 'details');
     }
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const handleSelectUserType = (type, fromExplore = false) => {
     setUserType(type);
@@ -210,6 +247,16 @@ const NewLoginFlow = () => {
     setError('');
     try {
       const userCredential = await login(email, password);
+
+      // Handle Remember Me functionality
+      if (rememberMe) {
+        localStorage.setItem('rememberedEmail', email);
+        localStorage.setItem('rememberMe', 'true');
+      } else {
+        localStorage.removeItem('rememberedEmail');
+        localStorage.removeItem('rememberMe');
+      }
+
       await redirectUser(userCredential.user);
     } catch (error) {
       setError('Failed to log in. Please check your credentials.');
@@ -392,17 +439,25 @@ const NewLoginFlow = () => {
             <div className="login-container">
               <div className="login-form">
                 <h2>Login to AmaPlayer</h2>
-                <p className="user-type-badge">
-                  Joining as: <span>{userType}</span>
-                  <button 
-                    onClick={() => setStep('type')}
-                    className="change-type-btn"
-                    type="button"
-                  >
-                    Change
-                  </button>
-                </p>
+                {userType !== 'returning-user' && (
+                  <p className="user-type-badge">
+                    Joining as: <span>{userType}</span>
+                    <button
+                      onClick={() => setStep('type')}
+                      className="change-type-btn"
+                      type="button"
+                    >
+                      Change
+                    </button>
+                  </p>
+                )}
+                {userType === 'returning-user' && (
+                  <p className="welcome-back-text" style={{textAlign: 'center', color: '#666', marginBottom: '20px'}}>
+                    Welcome back! Please sign in with your credentials.
+                  </p>
+                )}
                 
+                {logoutMessage && <div className="success-message" style={{color: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', padding: '10px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center'}}>{logoutMessage}</div>}
                 {error && <div className="error-message">{error}</div>}
                 
                 <form onSubmit={handleEmailLogin}>
@@ -424,6 +479,38 @@ const NewLoginFlow = () => {
                       required
                     />
                   </div>
+
+                  {/* Remember Me Checkbox */}
+                  <div className="form-group remember-me-group" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '20px'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="rememberMe"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#4CAF50'
+                      }}
+                    />
+                    <label
+                      htmlFor="rememberMe"
+                      style={{
+                        color: '#333',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                    >
+                      Remember me
+                    </label>
+                  </div>
+
                   <button type="submit" disabled={loading}>
                     {loading ? 'Logging in...' : 'Login'}
                   </button>
@@ -460,9 +547,14 @@ const NewLoginFlow = () => {
                     Don't have an account?{' '}
                     <a href="/signup" onClick={(e) => {
                       e.preventDefault();
-                      navigate(`/signup?type=${userType}`);
+                      if (userType === 'returning-user') {
+                        // For returning users, go to profile selection first
+                        navigate('/signup');
+                      } else {
+                        navigate(`/signup?type=${userType}`);
+                      }
                     }}>
-                      Sign up as {userType}
+                      {userType === 'returning-user' ? 'Sign up' : `Sign up as ${userType}`}
                     </a>
                   </p>
                   <p>

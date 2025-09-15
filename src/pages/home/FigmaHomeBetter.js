@@ -22,6 +22,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import notificationService from '../../services/notificationService';
 import './FigmaHomeBetter.css';
 
 // User Avatar component that handles both real images and placeholders
@@ -109,7 +110,7 @@ const PlaceholderImage = ({ width = 400, height = 250 }) => (
 );
 
 export const AmaPlayerHomePage = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, isGuest } = useAuth();
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
   
@@ -140,6 +141,37 @@ export const AmaPlayerHomePage = () => {
   const [newPost, setNewPost] = useState({ caption: '', image: null, mediaType: 'image' });
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  // Helper function to get comment count for a post
+  const getCommentCount = async (postId) => {
+    try {
+      const q = query(
+        collection(db, 'comments'),
+        where('postId', '==', postId)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.size;
+    } catch (error) {
+      console.error('Error getting comment count:', error);
+      return 0;
+    }
+  };
+
+  // Helper function to get share count for a post
+  const getShareCount = async (postId) => {
+    try {
+      const q = query(
+        collection(db, 'shares'),
+        where('postId', '==', postId)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.size;
+    } catch (error) {
+      console.error('Error getting share count:', error);
+      return 0;
+    }
+  };
 
   // Load posts from Firebase (only images and text posts)
   const loadPosts = async () => {
@@ -150,19 +182,27 @@ export const AmaPlayerHomePage = () => {
         orderBy('timestamp', 'desc'),
         limit(10)
       );
-      
+
       const querySnapshot = await getDocs(q);
       const postsData = [];
-      
-      querySnapshot.forEach((doc) => {
+
+      for (const doc of querySnapshot.docs) {
         const data = { id: doc.id, ...doc.data() };
         console.log('Post data:', data);
         // Only add non-video posts to main feed
         if (!data.videoUrl) {
-          postsData.push(data);
+          // Get real counts for each post
+          const commentCount = await getCommentCount(doc.id);
+          const shareCount = await getShareCount(doc.id);
+
+          postsData.push({
+            ...data,
+            commentCount,
+            shareCount
+          });
         }
-      });
-      
+      }
+
       console.log('Filtered posts for feed:', postsData);
       setPosts(postsData);
     } catch (error) {
@@ -266,20 +306,45 @@ export const AmaPlayerHomePage = () => {
     }
   };
 
+  // Fetch unread notifications count
+  const fetchUnreadNotifications = () => {
+    if (!currentUser || isGuest()) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('receiverId', '==', currentUser.uid),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unreadCount = snapshot.size;
+      setUnreadNotifications(unreadCount);
+    }, (error) => {
+      console.error('Error fetching unread notifications:', error);
+    });
+
+    return unsubscribe;
+  };
+
   useEffect(() => {
     loadPosts();
     loadReels();
     loadStories();
-    
-    // Fetch followed users
-    let unsubscribe;
+
+    // Fetch followed users and notifications
+    let unsubscribeFollowed;
+    let unsubscribeNotifications;
     if (currentUser) {
-      unsubscribe = fetchFollowedUsers();
+      unsubscribeFollowed = fetchFollowedUsers();
+      unsubscribeNotifications = fetchUnreadNotifications();
     }
-    
+
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
+      if (unsubscribeFollowed) {
+        unsubscribeFollowed();
+      }
+      if (unsubscribeNotifications) {
+        unsubscribeNotifications();
       }
     };
   }, [currentUser]); // Depend on currentUser for proper story loading
@@ -393,6 +458,19 @@ export const AmaPlayerHomePage = () => {
         await updateDoc(currentUserRef, {
           following: arrayUnion(postUserId)
         });
+
+        // Send follow notification
+        try {
+          await notificationService.sendFollowNotification(
+            currentUser.uid,
+            currentUser.displayName || 'Someone',
+            currentUser.photoURL || '',
+            postUserId
+          );
+        } catch (notificationError) {
+          console.error('Error sending follow notification:', notificationError);
+          // Don't fail the follow action if notification fails
+        }
       }
     } catch (error) {
       console.error('Error updating follow status:', error);
@@ -419,6 +497,18 @@ export const AmaPlayerHomePage = () => {
       postId: null,
       postAuthor: null
     });
+  };
+
+  // Handle comment added callback
+  const handleCommentAdded = (postId) => {
+    // Update the comment count for this post
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post.id === postId
+          ? { ...post, commentCount: (post.commentCount || 0) + 1 }
+          : post
+      )
+    );
   };
 
   // Handle opening reel viewer
@@ -514,6 +604,26 @@ export const AmaPlayerHomePage = () => {
     };
 
     try {
+      // Track the share in database first
+      if (currentUser && post.id) {
+        await addDoc(collection(db, 'shares'), {
+          postId: post.id,
+          userId: currentUser.uid,
+          userDisplayName: currentUser.displayName || 'Anonymous User',
+          timestamp: serverTimestamp(),
+          shareType: isReel ? 'reel' : 'post'
+        });
+
+        // Update local state to reflect new share count
+        setPosts(prevPosts =>
+          prevPosts.map(p =>
+            p.id === post.id
+              ? { ...p, shareCount: (p.shareCount || 0) + 1 }
+              : p
+          )
+        );
+      }
+
       if (navigator.share) {
         // Use native share API if available
         await navigator.share(shareData);
@@ -652,7 +762,16 @@ export const AmaPlayerHomePage = () => {
         <h1 className="home-title">AmaPlayer</h1>
         <div className="header-actions">
           <Search size={28} onClick={() => navigate('/search')} />
-          <Bell size={28} onClick={() => navigate('/messages')} />
+          <div className="notification-bell" onClick={() => navigate('/messages?tab=notifications')}>
+            <Bell
+              size={28}
+              color={unreadNotifications > 0 ? '#ff4444' : 'currentColor'}
+              fill={unreadNotifications > 0 ? '#ff4444' : 'none'}
+            />
+            {unreadNotifications > 0 && (
+              <span className="notification-badge">{unreadNotifications}</span>
+            )}
+          </div>
           <LogOut size={25} onClick={handleLogout} />
         </div>
       </div>
@@ -762,11 +881,11 @@ export const AmaPlayerHomePage = () => {
                     </div>
                     <div className="stat-item">
                       <span className="stat-label">Comments</span>
-                      <span className="stat-count">{post.comments?.length || 0}</span>
+                      <span className="stat-count">{post.commentCount || 0}</span>
                     </div>
                     <div className="stat-item">
                       <span className="stat-label">Shares</span>
-                      <span className="stat-count">1.2k</span>
+                      <span className="stat-count">{post.shareCount || 0}</span>
                     </div>
                   </div>
                   {/* Action Buttons - Left side */}
@@ -992,6 +1111,7 @@ export const AmaPlayerHomePage = () => {
         onClose={handleCloseComments}
         postId={commentDrawer.postId}
         postAuthor={commentDrawer.postAuthor}
+        onCommentAdded={handleCommentAdded}
       />
 
       {/* Reel Viewer */}
@@ -1014,6 +1134,7 @@ export const AmaPlayerHomePage = () => {
         onClose={handleCloseReelComments}
         postId={reelCommentDrawer.postId}
         postAuthor={reelCommentDrawer.postAuthor}
+        onCommentAdded={handleCommentAdded}
       />
     </div>
   );

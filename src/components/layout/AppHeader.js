@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -6,15 +6,52 @@ import ThemeToggle from '../common/ui/ThemeToggle';
 import LanguageSelector from '../common/forms/LanguageSelector';
 import './AppHeader.css';
 
-const AppHeader = memo(function AppHeader({ 
-  title = 'AmaPlayer', 
-  showBackButton = false, 
+const AppHeader = memo(function AppHeader({
+  title = 'AmaPlayer',
+  showBackButton = false,
   onTitleClick = null,
-  showThemeToggle = true 
+  showThemeToggle = true
 }) {
   const { isGuest, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      // Show navbar when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY || currentScrollY < 10) {
+        // Scrolling up or near top
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Scrolling down and past threshold
+        setIsVisible(false);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    // Throttle scroll events
+    let ticking = false;
+    const throttledHandleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', throttledHandleScroll);
+    };
+  }, [lastScrollY]);
 
   const handleTitleClick = () => {
     if (onTitleClick) {
@@ -38,7 +75,7 @@ const AppHeader = memo(function AppHeader({
   };
 
   return (
-    <header className="app-header">
+    <header className={`app-header ${isVisible ? 'visible' : 'hidden'}`}>
       <div className="header-content">
         <div className="header-left">
           {showBackButton && (

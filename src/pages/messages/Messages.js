@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
@@ -11,6 +11,7 @@ import './Messages.css';
 
 export default function Messages() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, isGuest } = useAuth();
   const [activeTab, setActiveTab] = useState('friends');
   const [messages, setMessages] = useState([]);
@@ -29,6 +30,15 @@ export default function Messages() {
   const [showMessageWarning, setShowMessageWarning] = useState(false);
   const [followedUsers, setFollowedUsers] = useState([]);
   const [followingUser, setFollowingUser] = useState(null);
+
+  // Handle URL parameters to set active tab
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'notifications') {
+      setActiveTab('notifications');
+    }
+  }, [location.search]);
 
   useEffect(() => {
     console.log('📱 Messages: Initializing component', { currentUser: !!currentUser, isGuest: isGuest() });
