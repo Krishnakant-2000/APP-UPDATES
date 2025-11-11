@@ -34,6 +34,7 @@ const NavigationBar = ({ currentUser, isGuest, onTitleClick, title = "AmaPlayer"
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleSettingsToggle = () => {
+    console.log('⚙️ Settings toggle clicked, current state:', settingsOpen);
     setSettingsOpen(!settingsOpen);
   };
 
@@ -42,6 +43,7 @@ const NavigationBar = ({ currentUser, isGuest, onTitleClick, title = "AmaPlayer"
   };
 
   const handleNotificationsToggle = () => {
+    console.log('🔔 Notification toggle clicked, current state:', notificationsOpen);
     setNotificationsOpen(!notificationsOpen);
     setSettingsOpen(false); // Close settings if open
   };

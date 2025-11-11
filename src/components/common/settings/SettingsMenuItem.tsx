@@ -28,6 +28,8 @@ const SettingsMenuItem: React.FC<SettingsMenuItemProps> = ({
     }
   };
 
+  console.log(`🔧 SettingsMenuItem rendering: "${label}", hasChildren:`, !!children);
+
   return (
     <>
       <div

@@ -148,7 +148,12 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ isOpen, onClose, isGuest, t
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('⚙️ SettingsMenu: isOpen is false, not rendering');
+    return null;
+  }
+
+  console.log('⚙️ SettingsMenu: Rendering. isGuest=', isGuest, 'currentUser=', currentUser?.uid);
 
   return (
     <div

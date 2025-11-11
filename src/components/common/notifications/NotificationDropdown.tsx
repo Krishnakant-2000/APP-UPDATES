@@ -196,7 +196,12 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     return date.toLocaleDateString();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('🔕 NotificationDropdown: isOpen is false, not rendering');
+    return null;
+  }
+
+  console.log('🔔 NotificationDropdown: Rendering with', notifications.length, 'notifications');
 
   return (
     <div className="notification-dropdown" ref={dropdownRef}>
