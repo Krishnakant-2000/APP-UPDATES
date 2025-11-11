@@ -196,8 +196,32 @@ if (process.env.NODE_ENV === 'development') {
   console.log('  - window.debugUtils.clearCache() - Clear cache data');
 }
 
+// Load non-critical styles after initial render
+const loadNonCriticalStyles = () => {
+  const stylesToLoad = [
+    './styles/global.css',
+    './styles/themes.css',
+    './styles/optimized.css',
+    './performance.css'
+  ];
+
+  stylesToLoad.forEach(href => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.media = 'print';
+    link.onload = () => {
+      link.media = 'all';
+    };
+    document.head.appendChild(link);
+  });
+};
+
 // Enhanced performance monitoring with advanced Web Vitals tracking
 window.addEventListener('load', () => {
+  // Load non-critical styles
+  setTimeout(loadNonCriticalStyles, 100);
+
   // Import and initialize advanced WebVitals collector
   import('./utils/performance/WebVitalsCollector').then(({ webVitalsCollector }) => {
     // Set up callback to send vitals to analytics
@@ -208,20 +232,19 @@ window.addEventListener('load', () => {
         rating: score < 0.5 ? 'poor' : score < 0.8 ? 'needs-improvement' : 'good'
       };
       
-      // Send to analytics
-      webVitalsCollector.sendToAnalytics(vitalsData);
+      // Send to analytics (only in production)
+      if (process.env.NODE_ENV === 'production') {
+        webVitalsCollector.sendToAnalytics(vitalsData);
+      }
       
       // Log in development
       if (process.env.NODE_ENV === 'development') {
-        console.log(`📊 Web Vital - ${metric.toUpperCase()}: ${value}ms (Score: ${score.toFixed(2)})`);
+        console.log(`📊 ${metric.toUpperCase()}: ${value}ms (${vitalsData.rating})`);
       }
     });
     
-    console.log('🚀 Advanced Web Vitals tracking initialized');
+    console.log('🚀 Performance monitoring initialized');
   }).catch(err => {
-    console.warn('Failed to initialize Web Vitals tracking:', err);
+    console.warn('Performance monitoring failed:', err);
   });
-    
-  // Log that performance monitoring is active
-  // console.log('🚀 AmaPlayer Performance Monitoring Active');
 });

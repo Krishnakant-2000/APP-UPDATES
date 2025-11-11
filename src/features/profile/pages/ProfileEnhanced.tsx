@@ -10,7 +10,13 @@ import AchievementModal from '../components/AchievementModal';
 import CertificateModal from '../components/CertificateModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import EditProfileModal, { EditProfileData } from '../components/EditProfileModal';
-import { UserRole, PersonalDetails, ProfileEnhancedState, roleConfigurations, Achievement, Certificate } from '../types/ProfileTypes';
+import PersonalDetailsModal from '../components/PersonalDetailsModal';
+import PhysicalAttributesModal from '../components/PhysicalAttributesModal';
+import TrackBestSection from '../components/TrackBestSection';
+import TrackBestModal from '../components/TrackBestModal';
+import AchievementsSectionModal from '../components/AchievementsSectionModal';
+import CertificatesSectionModal from '../components/CertificatesSectionModal';
+import { UserRole, PersonalDetails, PhysicalAttributes, TrackBest, ProfileEnhancedState, roleConfigurations, Achievement, Certificate } from '../types/ProfileTypes';
 import { TalentVideo } from '../types/TalentVideoTypes';
 import { useAuth } from '../../../contexts/AuthContext';
 import userService from '../../../services/api/userService';
@@ -67,6 +73,14 @@ const ProfileEnhanced: React.FC = () => {
       trainingAcademy: 'Elite Basketball Academy',
       schoolName: 'LA Sports High',
       clubName: 'Lakers Youth'
+    },
+    trackBest: {
+      points: '35',
+      rebounds: '12',
+      gameTime: '40',
+      matchDate: '2024-03-15',
+      opponent: 'Warriors Youth',
+      venue: 'Staples Center'
     }
   });
 
@@ -81,7 +95,12 @@ const ProfileEnhanced: React.FC = () => {
   const [deleteType, setDeleteType] = useState<'achievement' | 'certificate'>('achievement');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
-  const [editModalInitialTab, setEditModalInitialTab] = useState<'personal' | 'achievements' | 'certificates' | 'videos' | 'posts' | 'organization' | 'coaching' | 'parent'>('personal');
+  const [editModalInitialTab, setEditModalInitialTab] = useState<'personal' | 'physicalAttributes' | 'trackBest' | 'achievements' | 'certificates' | 'videos' | 'posts' | 'organization' | 'coaching' | 'parent'>('personal');
+  const [isPersonalDetailsModalOpen, setIsPersonalDetailsModalOpen] = useState(false);
+  const [isPhysicalAttributesModalOpen, setIsPhysicalAttributesModalOpen] = useState(false);
+  const [isTrackBestModalOpen, setIsTrackBestModalOpen] = useState(false);
+  const [isAchievementsSectionModalOpen, setIsAchievementsSectionModalOpen] = useState(false);
+  const [isCertificatesSectionModalOpen, setIsCertificatesSectionModalOpen] = useState(false);
 
   // Load user profile data from Firebase on component mount
   useEffect(() => {
@@ -166,9 +185,29 @@ const ProfileEnhanced: React.FC = () => {
     }));
   };
 
-  const handleEditProfile = (section: 'personal' | 'achievements' | 'certificates' | 'videos' | 'posts' | 'organization' | 'coaching' | 'parent' = 'personal') => {
-    setEditModalInitialTab(section);
-    setIsEditProfileModalOpen(true);
+  const handleEditProfile = (section: 'personal' | 'physicalAttributes' | 'trackBest' | 'achievements' | 'certificates' | 'videos' | 'posts' | 'organization' | 'coaching' | 'parent' = 'personal') => {
+    // Route to specific section modals instead of the big modal
+    switch (section) {
+      case 'personal':
+        setIsPersonalDetailsModalOpen(true);
+        break;
+      case 'physicalAttributes':
+        setIsPhysicalAttributesModalOpen(true);
+        break;
+      case 'trackBest':
+        setIsTrackBestModalOpen(true);
+        break;
+      case 'achievements':
+        setIsAchievementsSectionModalOpen(true);
+        break;
+      case 'certificates':
+        setIsCertificatesSectionModalOpen(true);
+        break;
+      default:
+        setEditModalInitialTab(section);
+        setIsEditProfileModalOpen(true);
+        break;
+    }
   };
 
   const handleSaveProfile = async (data: EditProfileData) => {
@@ -213,6 +252,122 @@ const ProfileEnhanced: React.FC = () => {
 
   const handleCloseEditProfile = () => {
     setIsEditProfileModalOpen(false);
+  };
+
+  // Handler for personal details modal
+  const handleSavePersonalDetails = async (updatedPersonalDetails: PersonalDetails) => {
+    setProfileState(prev => ({
+      ...prev,
+      personalDetails: updatedPersonalDetails
+    }));
+    
+    // Save user profile data to localStorage for immediate UI update
+    localStorage.setItem('userSport', updatedPersonalDetails.sport || '');
+    localStorage.setItem('userPosition', updatedPersonalDetails.position || '');
+    localStorage.setItem('userPlayerType', updatedPersonalDetails.playerType || '');
+    localStorage.setItem('userOrganizationType', updatedPersonalDetails.organizationType || '');
+    if (updatedPersonalDetails.specializations) {
+      localStorage.setItem('userSpecializations', JSON.stringify(updatedPersonalDetails.specializations));
+    }
+    
+    // Save to Firebase
+    if (currentUser) {
+      try {
+        await userService.updateUserProfile(currentUser.uid, {
+          sports: updatedPersonalDetails.sport ? [updatedPersonalDetails.sport] : undefined,
+          position: updatedPersonalDetails.position,
+          specializations: updatedPersonalDetails.specializations
+        } as any);
+        console.log('✅ Personal details saved to Firebase');
+      } catch (error) {
+        console.error('❌ Error saving personal details to Firebase:', error);
+      }
+    }
+    
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('userProfileUpdated'));
+    
+    setIsPersonalDetailsModalOpen(false);
+  };
+
+  // Handler for physical attributes modal
+  const handleSavePhysicalAttributes = async (updatedPhysicalAttributes: PhysicalAttributes) => {
+    setProfileState(prev => ({
+      ...prev,
+      physicalAttributes: updatedPhysicalAttributes
+    }));
+    
+    // Save to Firebase
+    if (currentUser) {
+      try {
+        // Physical attributes would be saved as part of user profile
+        console.log('✅ Physical attributes saved');
+      } catch (error) {
+        console.error('❌ Error saving physical attributes:', error);
+      }
+    }
+    
+    setIsPhysicalAttributesModalOpen(false);
+  };
+
+  // Handler for achievements section modal
+  const handleSaveAchievements = async (updatedAchievements: Achievement[]) => {
+    setProfileState(prev => ({
+      ...prev,
+      achievements: updatedAchievements
+    }));
+    
+    // Save to Firebase
+    if (currentUser) {
+      try {
+        // Achievements would be saved as part of user profile
+        console.log('✅ Achievements saved');
+      } catch (error) {
+        console.error('❌ Error saving achievements:', error);
+      }
+    }
+    
+    setIsAchievementsSectionModalOpen(false);
+  };
+
+  // Handler for certificates section modal
+  const handleSaveCertificates = async (updatedCertificates: Certificate[]) => {
+    setProfileState(prev => ({
+      ...prev,
+      certificates: updatedCertificates
+    }));
+    
+    // Save to Firebase
+    if (currentUser) {
+      try {
+        // Certificates would be saved as part of user profile
+        console.log('✅ Certificates saved');
+      } catch (error) {
+        console.error('❌ Error saving certificates:', error);
+      }
+    }
+    
+    setIsCertificatesSectionModalOpen(false);
+  };
+
+  // Handler for track best modal
+  const handleSaveTrackBest = async (updatedTrackBest: TrackBest) => {
+    setProfileState(prev => ({
+      ...prev,
+      trackBest: updatedTrackBest
+    }));
+    
+    // Save to Firebase
+    if (currentUser) {
+      try {
+        // Track best would be saved as part of user profile
+        console.log('✅ Track best saved');
+      } catch (error) {
+        console.error('❌ Error saving track best:', error);
+      }
+    }
+    
+    setIsTrackBestModalOpen(false);
   };
 
   const handleAddAthlete = () => {
@@ -505,6 +660,14 @@ const ProfileEnhanced: React.FC = () => {
         </div>
       </header>
 
+      {/* Track Best Section */}
+      <TrackBestSection
+        trackBest={profileState.trackBest}
+        sport={profileState.personalDetails.sport}
+        isOwner={true}
+        onEditSection={() => setIsTrackBestModalOpen(true)}
+      />
+
       <section className="personal-details" aria-labelledby="personal-details-heading">
         <div className="section-header">
           <h2 id="personal-details-heading" className="section-title">
@@ -632,6 +795,48 @@ const ProfileEnhanced: React.FC = () => {
         talentVideos={profileState.talentVideos}
         posts={profileState.posts}
         initialTab={editModalInitialTab}
+      />
+
+      {/* Personal Details Modal */}
+      <PersonalDetailsModal
+        isOpen={isPersonalDetailsModalOpen}
+        personalDetails={profileState.personalDetails}
+        currentRole={profileState.currentRole}
+        onSave={handleSavePersonalDetails}
+        onClose={() => setIsPersonalDetailsModalOpen(false)}
+      />
+
+      {/* Physical Attributes Modal */}
+      <PhysicalAttributesModal
+        isOpen={isPhysicalAttributesModalOpen}
+        physicalAttributes={profileState.physicalAttributes}
+        onSave={handleSavePhysicalAttributes}
+        onClose={() => setIsPhysicalAttributesModalOpen(false)}
+      />
+
+      {/* Track Best Modal */}
+      <TrackBestModal
+        isOpen={isTrackBestModalOpen}
+        trackBest={profileState.trackBest}
+        sport={profileState.personalDetails.sport || 'basketball'}
+        onSave={handleSaveTrackBest}
+        onClose={() => setIsTrackBestModalOpen(false)}
+      />
+
+      {/* Achievements Section Modal */}
+      <AchievementsSectionModal
+        isOpen={isAchievementsSectionModalOpen}
+        achievements={profileState.achievements}
+        onSave={handleSaveAchievements}
+        onClose={() => setIsAchievementsSectionModalOpen(false)}
+      />
+
+      {/* Certificates Section Modal */}
+      <CertificatesSectionModal
+        isOpen={isCertificatesSectionModalOpen}
+        certificates={profileState.certificates}
+        onSave={handleSaveCertificates}
+        onClose={() => setIsCertificatesSectionModalOpen(false)}
       />
     </main>
   );

@@ -65,6 +65,12 @@
   --transition-slow: 0.5s ease;
   --transition-bounce: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
+  /* Glass Effect Variables */
+  --glass-bg: rgba(0, 0, 0, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  
   /* Role Badge Variables - Dark Theme */
   --role-athlete-bg: #1e3a8a;
   --role-athlete-text: #bfdbfe;
@@ -120,6 +126,12 @@
   --message-input-bg: var(--bg-card);
   --message-input-border: var(--border-secondary);
   --message-input-focus: var(--accent-primary);
+  
+  /* Light theme glass effect */
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
   
   /* Role Badge Variables - Light Theme */
   --role-athlete-bg: #dbeafe;

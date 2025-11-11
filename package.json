@@ -24,8 +24,9 @@
   "scripts": {
     "start": "craco start",
     "dev": "craco start",
-    "build": "craco build",
-    "build:analyze": "npm run build && npx serve -s build",
+    "build": "craco build && node scripts/optimize-build.js",
+    "build:analyze": "set ANALYZE=true && craco build",
+    "build:serve": "npm run build && npx serve -s build",
     "test": "craco test --watchAll=false",
     "test:watch": "craco test",
     "test:coverage": "craco test --coverage --watchAll=false",

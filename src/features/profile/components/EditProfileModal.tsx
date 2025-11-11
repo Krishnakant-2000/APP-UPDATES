@@ -34,7 +34,7 @@ export interface EditProfileData {
   posts: Post[];
 }
 
-type TabType = 'personal' | 'physicalAttributes' | 'achievements' | 'certificates' | 'videos' | 'posts' | 'organization' | 'coaching' | 'parent';
+type TabType = 'personal' | 'physicalAttributes' | 'trackBest' | 'achievements' | 'certificates' | 'videos' | 'posts' | 'organization' | 'coaching' | 'parent';
 
 interface FormErrors {
   [key: string]: string;

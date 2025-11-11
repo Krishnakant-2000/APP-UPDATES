@@ -14,7 +14,12 @@ export function useTheme(): ThemeContextValue {
 export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const savedTheme = localStorage.getItem('amaplayer-theme');
-    return savedTheme ? JSON.parse(savedTheme) : true; // Default to dark mode
+    const isDark = savedTheme ? JSON.parse(savedTheme) : true; // Default to dark mode
+    
+    // Set theme immediately to prevent flash
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    
+    return isDark;
   });
 
   useEffect(() => {
