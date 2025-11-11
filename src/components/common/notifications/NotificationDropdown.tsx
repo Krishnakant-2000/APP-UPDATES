@@ -35,6 +35,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   const { currentUser, isGuest } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch notifications
@@ -51,7 +52,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       const q = query(
         notificationsRef,
         where('receiverId', '==', currentUser.uid),
-        limit(20)
+        limit(isExpanded ? 100 : 10)
       );
 
       unsubscribe = onSnapshot(q, (snapshot) => {
@@ -84,7 +85,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
         unsubscribe();
       }
     };
-  }, [currentUser, isGuest]);
+  }, [currentUser, isGuest, isExpanded]);
 
   // Handle click outside to close
   useEffect(() => {
@@ -199,7 +200,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   console.log('📱 NotificationDropdown rendering! Notifications:', notifications.length);
 
   return (
-    <div className="notification-dropdown" ref={dropdownRef}>
+    <div className={`notification-dropdown ${isExpanded ? 'expanded' : ''}`} ref={dropdownRef}>
       <div className="notification-header">
         <h3>Notifications</h3>
         <button className="close-btn" onClick={onClose}>
@@ -249,14 +250,11 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       
       {notifications.length > 0 && (
         <div className="notification-footer">
-          <button 
+          <button
             className="view-all-btn"
-            onClick={() => {
-              onClose();
-              navigate('/messages');
-            }}
+            onClick={() => setIsExpanded(!isExpanded)}
           >
-            View All
+            {isExpanded ? 'Show Less' : 'View All'}
           </button>
         </div>
       )}

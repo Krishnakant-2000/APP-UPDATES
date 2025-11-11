@@ -46,6 +46,11 @@
 .notification-list {
   max-height: 400px;
   overflow-y: auto;
+  transition: max-height 0.3s ease;
+}
+
+.notification-dropdown.expanded .notification-list {
+  max-height: 600px;
 }
 
 .notification-item {
