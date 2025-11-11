@@ -33,6 +33,21 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>AmaPlayer - Sports Social Media Platform v2.1</title>
+    
+    <!-- Theme initialization script - prevents flash of unstyled content -->
+    <script>
+      (function() {
+        try {
+          const savedTheme = localStorage.getItem('amaplayer-theme');
+          const isDark = savedTheme ? JSON.parse(savedTheme) : true; // Default to dark mode
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        } catch (e) {
+          // Fallback to dark theme if localStorage fails
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+    
     <script>
       // Conservative cache busting for Chrome - prevent infinite reload
       (function() {

@@ -57,6 +57,39 @@ export interface PhysicalAttributes {
   clubName?: string;
 }
 
+export interface TrackBest {
+  // Cricket specific
+  runs?: string;
+  overs?: string;
+  strikeRate?: string;
+  
+  // Football specific
+  goals?: string;
+  minutes?: string;
+  assists?: string;
+  
+  // Basketball specific
+  points?: string;
+  rebounds?: string;
+  gameTime?: string;
+  
+  // Tennis specific
+  aces?: string;
+  winners?: string;
+  matchDuration?: string;
+  
+  // Generic fields for other sports
+  field1?: string;
+  field2?: string;
+  field3?: string;
+  
+  // Meta info
+  sport?: string;
+  matchDate?: string;
+  opponent?: string;
+  venue?: string;
+}
+
 export interface Achievement {
   id: string;
   title: string;
@@ -100,6 +133,7 @@ export interface ProfileEnhancedState {
   posts: Post[];
   personalDetails: PersonalDetails;
   physicalAttributes: PhysicalAttributes;
+  trackBest: TrackBest;
 }
 
 export interface RoleConfig {

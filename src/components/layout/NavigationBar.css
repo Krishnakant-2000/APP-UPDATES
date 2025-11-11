@@ -1,13 +1,15 @@
 /* NavigationBar Component Styles */
 
 .nav-bar {
-  background: var(--bg-primary, white);
-  border-bottom: 1px solid var(--border-color, #eee);
+  background: var(--glass-bg);
+  border-bottom: 1px solid var(--glass-border);
   padding: 0 16px;
   position: sticky;
   top: 0;
   z-index: 1000; /* Below modals (2000+) but above content */
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
 }
 
 .nav-content {
@@ -94,15 +96,15 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: var(--bg-card, rgba(255, 255, 255, 0.1));
-  border: 2px solid var(--border-secondary, rgba(255, 255, 255, 0.1));
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 50%;
   cursor: pointer;
   color: var(--text-secondary, #666);
   transition: all 0.3s ease;
   position: relative;
   backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-primary, 0 2px 8px rgba(0, 0, 0, 0.1));
+  box-shadow: var(--glass-shadow);
 }
 
 /* Force icon sizes to remain consistent */
@@ -121,11 +123,11 @@
 .notification-btn:hover,
 .settings-btn:hover,
 .logout-btn:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.15));
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary, #333);
   border-color: var(--accent-primary, #007bff);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 123, 255, 0.2);
 }
 
 .search-btn:active,
@@ -276,6 +278,12 @@
   .nav-content {
     height: 52px;
   }
+}
+
+/* Glass effect enhancement */
+.nav-bar {
+  position: relative;
+  overflow: hidden;
 }
 
 /* Touch device optimizations */

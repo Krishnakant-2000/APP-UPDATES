@@ -14,6 +14,8 @@ import SportBanner from '../components/SportBanner';
 import {
   UserRole,
   PersonalDetails,
+  PhysicalAttributes,
+  TrackBest,
   Achievement,
   Certificate,
   Post,
@@ -21,6 +23,7 @@ import {
 } from '../types/ProfileTypes';
 import { TalentVideo } from '../types/TalentVideoTypes';
 import PhysicalAttributesSection from '../components/PhysicalAttributesSection';
+import TrackBestSection from '../components/TrackBestSection';
 import AchievementsCertificatesSection from '../components/AchievementsCertificatesSection';
 import '../styles/Profile.css';
 
@@ -28,6 +31,11 @@ import '../styles/Profile.css';
 const TalentVideosSection = lazy(() => import('../components/TalentVideosSection'));
 const PostsSection = lazy(() => import('../components/PostsSection'));
 const EditProfileModal = lazy(() => import('../components/EditProfileModal'));
+const PersonalDetailsModal = lazy(() => import('../components/PersonalDetailsModal'));
+const PhysicalAttributesModal = lazy(() => import('../components/PhysicalAttributesModal'));
+const TrackBestModal = lazy(() => import('../components/TrackBestModal'));
+const AchievementsSectionModal = lazy(() => import('../components/AchievementsSectionModal'));
+const CertificatesSectionModal = lazy(() => import('../components/CertificatesSectionModal'));
 
 const Profile: React.FC = React.memo(() => {
   const navigate = useNavigate();
@@ -63,7 +71,7 @@ const Profile: React.FC = React.memo(() => {
     name: 'Loading...'
   });
 
-  const [physicalAttributes, setPhysicalAttributes] = useState({
+  const [physicalAttributes, setPhysicalAttributes] = useState<PhysicalAttributes>({
     height: undefined,
     weight: undefined,
     dominantSide: undefined,
@@ -74,6 +82,28 @@ const Profile: React.FC = React.memo(() => {
     trainingAcademy: undefined,
     schoolName: undefined,
     clubName: undefined
+  });
+
+  const [trackBest, setTrackBest] = useState<TrackBest>({
+    runs: undefined,
+    overs: undefined,
+    strikeRate: undefined,
+    goals: undefined,
+    minutes: undefined,
+    assists: undefined,
+    points: undefined,
+    rebounds: undefined,
+    gameTime: undefined,
+    aces: undefined,
+    winners: undefined,
+    matchDuration: undefined,
+    field1: undefined,
+    field2: undefined,
+    field3: undefined,
+    sport: undefined,
+    matchDate: undefined,
+    opponent: undefined,
+    venue: undefined
   });
 
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -226,6 +256,7 @@ const Profile: React.FC = React.memo(() => {
             setAchievements(userData.achievements || []);
             setCertificates(userData.certificates || []);
             setTalentVideos(userData.talentVideos || []);
+            setTrackBest(userData.trackBest || {});
             setProfilePicture(userData.profilePicture || userData.photoURL || null);
             setCoverPhoto(userData.coverPhoto || null);
             setAthleteSports(userData.sportDetails || []);
@@ -319,19 +350,84 @@ const Profile: React.FC = React.memo(() => {
   };
 
   const [editModalInitialTab, setEditModalInitialTab] = useState<string>('personal');
+  const [isPersonalDetailsModalOpen, setIsPersonalDetailsModalOpen] = useState(false);
+  const [isPhysicalAttributesModalOpen, setIsPhysicalAttributesModalOpen] = useState(false);
+  const [isTrackBestModalOpen, setIsTrackBestModalOpen] = useState(false);
+  const [isAchievementsSectionModalOpen, setIsAchievementsSectionModalOpen] = useState(false);
+  const [isCertificatesSectionModalOpen, setIsCertificatesSectionModalOpen] = useState(false);
 
   const handleEditProfile = useCallback(() => {
     setIsEditModalOpen(true);
   }, []);
 
+  const handleEditPersonalDetails = useCallback(() => {
+    setIsPersonalDetailsModalOpen(true);
+  }, []);
+
+  const handleEditPhysicalAttributes = useCallback(() => {
+    setIsPhysicalAttributesModalOpen(true);
+  }, []);
+
+  const handleEditAchievements = useCallback(() => {
+    setIsAchievementsSectionModalOpen(true);
+  }, []);
+
+  const handleEditTrackBest = useCallback(() => {
+    setIsTrackBestModalOpen(true);
+  }, []);
+
+  const handleEditCertificates = useCallback(() => {
+    setIsCertificatesSectionModalOpen(true);
+  }, []);
+
   const handleEditProfileWithTab = useCallback((initialTab: string) => {
-    setEditModalInitialTab(initialTab);
-    setIsEditModalOpen(true);
+    // Route to specific section modals instead of the big modal
+    switch (initialTab) {
+      case 'personal':
+        setIsPersonalDetailsModalOpen(true);
+        break;
+      case 'physicalAttributes':
+        setIsPhysicalAttributesModalOpen(true);
+        break;
+      case 'trackBest':
+        setIsTrackBestModalOpen(true);
+        break;
+      case 'achievements':
+        setIsAchievementsSectionModalOpen(true);
+        break;
+      case 'certificates':
+        setIsCertificatesSectionModalOpen(true);
+        break;
+      default:
+        setEditModalInitialTab(initialTab);
+        setIsEditModalOpen(true);
+        break;
+    }
   }, []);
 
   const handleOpenEditModal = useCallback((initialTab: string) => {
-    setEditModalInitialTab(initialTab);
-    setIsEditModalOpen(true);
+    // Route to specific section modals instead of the big modal
+    switch (initialTab) {
+      case 'personal':
+        setIsPersonalDetailsModalOpen(true);
+        break;
+      case 'physicalAttributes':
+        setIsPhysicalAttributesModalOpen(true);
+        break;
+      case 'trackBest':
+        setIsTrackBestModalOpen(true);
+        break;
+      case 'achievements':
+        setIsAchievementsSectionModalOpen(true);
+        break;
+      case 'certificates':
+        setIsCertificatesSectionModalOpen(true);
+        break;
+      default:
+        setEditModalInitialTab(initialTab);
+        setIsEditModalOpen(true);
+        break;
+    }
   }, []);
 
   // Keyboard navigation handler
@@ -715,6 +811,197 @@ const Profile: React.FC = React.memo(() => {
       }
     }
   }), [announceToScreenReader, posts, firebaseUser]);
+
+  // Handler for personal details modal
+  const handleSavePersonalDetails = useCallback(async (updatedPersonalDetails: PersonalDetails) => {
+    try {
+      // Update local state immediately for better UX
+      setPersonalDetails(updatedPersonalDetails);
+
+      // Save to Firebase
+      if (firebaseUser?.uid) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../../../lib/firebase');
+
+        // Prepare update data, filtering out undefined values
+        const updateData = {
+          displayName: updatedPersonalDetails.name,
+          name: updatedPersonalDetails.name,
+          dateOfBirth: updatedPersonalDetails.dateOfBirth,
+          gender: updatedPersonalDetails.gender,
+          mobile: updatedPersonalDetails.mobile,
+          email: updatedPersonalDetails.email,
+          city: updatedPersonalDetails.city,
+          district: updatedPersonalDetails.district,
+          state: updatedPersonalDetails.state,
+          country: updatedPersonalDetails.country,
+          playerType: updatedPersonalDetails.playerType,
+          sport: updatedPersonalDetails.sport,
+          position: updatedPersonalDetails.position,
+          organizationName: updatedPersonalDetails.organizationName,
+          organizationType: updatedPersonalDetails.organizationType,
+          location: updatedPersonalDetails.location,
+          contactEmail: updatedPersonalDetails.contactEmail,
+          website: updatedPersonalDetails.website,
+          relationship: updatedPersonalDetails.relationship,
+          connectedAthletes: updatedPersonalDetails.connectedAthletes,
+          specializations: updatedPersonalDetails.specializations,
+          yearsExperience: updatedPersonalDetails.yearsExperience,
+          coachingLevel: updatedPersonalDetails.coachingLevel,
+          updatedAt: new Date()
+        };
+
+        // Filter out undefined values
+        const cleanedUpdateData = Object.fromEntries(
+          Object.entries(updateData).filter(([_, value]) => value !== undefined)
+        );
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await updateDoc(userRef, cleanedUpdateData);
+
+        console.log('Personal details updated successfully in Firebase');
+      }
+
+      setIsPersonalDetailsModalOpen(false);
+      announceToScreenReader('Personal details updated successfully');
+    } catch (error) {
+      console.error('Error saving personal details:', error);
+      announceToScreenReader('Failed to save personal details');
+      alert('Failed to save personal details. Please try again.');
+    }
+  }, [announceToScreenReader, firebaseUser]);
+
+  // Handler for physical attributes modal
+  const handleSavePhysicalAttributes = useCallback(async (updatedPhysicalAttributes: PhysicalAttributes) => {
+    try {
+      // Update local state immediately for better UX
+      setPhysicalAttributes(updatedPhysicalAttributes);
+
+      // Save to Firebase
+      if (firebaseUser?.uid) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../../../lib/firebase');
+
+        const updateData = {
+          height: updatedPhysicalAttributes.height,
+          weight: updatedPhysicalAttributes.weight,
+          dominantSide: updatedPhysicalAttributes.dominantSide,
+          personalBest: updatedPhysicalAttributes.personalBest,
+          seasonBest: updatedPhysicalAttributes.seasonBest,
+          coachName: updatedPhysicalAttributes.coachName,
+          coachContact: updatedPhysicalAttributes.coachContact,
+          trainingAcademy: updatedPhysicalAttributes.trainingAcademy,
+          schoolName: updatedPhysicalAttributes.schoolName,
+          clubName: updatedPhysicalAttributes.clubName,
+          updatedAt: new Date()
+        };
+
+        // Filter out undefined values
+        const cleanedUpdateData = Object.fromEntries(
+          Object.entries(updateData).filter(([_, value]) => value !== undefined)
+        );
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await updateDoc(userRef, cleanedUpdateData);
+
+        console.log('Physical attributes updated successfully in Firebase');
+      }
+
+      setIsPhysicalAttributesModalOpen(false);
+      announceToScreenReader('Physical attributes updated successfully');
+    } catch (error) {
+      console.error('Error saving physical attributes:', error);
+      announceToScreenReader('Failed to save physical attributes');
+      alert('Failed to save physical attributes. Please try again.');
+    }
+  }, [announceToScreenReader, firebaseUser]);
+
+  // Handler for track best modal
+  const handleSaveTrackBest = useCallback(async (updatedTrackBest: TrackBest) => {
+    try {
+      // Update local state immediately for better UX
+      setTrackBest(updatedTrackBest);
+
+      // Save to Firebase
+      if (firebaseUser?.uid) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../../../lib/firebase');
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await updateDoc(userRef, {
+          trackBest: updatedTrackBest,
+          updatedAt: new Date()
+        });
+
+        console.log('Track best updated successfully in Firebase');
+      }
+
+      setIsTrackBestModalOpen(false);
+      announceToScreenReader('Track best updated successfully');
+    } catch (error) {
+      console.error('Error saving track best:', error);
+      announceToScreenReader('Failed to save track best');
+      alert('Failed to save track best. Please try again.');
+    }
+  }, [announceToScreenReader, firebaseUser]);
+
+  // Handler for achievements section modal
+  const handleSaveAchievements = useCallback(async (updatedAchievements: Achievement[]) => {
+    try {
+      // Update local state immediately for better UX
+      setAchievements(updatedAchievements);
+
+      // Save to Firebase
+      if (firebaseUser?.uid) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../../../lib/firebase');
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await updateDoc(userRef, {
+          achievements: updatedAchievements,
+          updatedAt: new Date()
+        });
+
+        console.log('Achievements updated successfully in Firebase');
+      }
+
+      setIsAchievementsSectionModalOpen(false);
+      announceToScreenReader('Achievements updated successfully');
+    } catch (error) {
+      console.error('Error saving achievements:', error);
+      announceToScreenReader('Failed to save achievements');
+      alert('Failed to save achievements. Please try again.');
+    }
+  }, [announceToScreenReader, firebaseUser]);
+
+  // Handler for certificates section modal
+  const handleSaveCertificates = useCallback(async (updatedCertificates: Certificate[]) => {
+    try {
+      // Update local state immediately for better UX
+      setCertificates(updatedCertificates);
+
+      // Save to Firebase
+      if (firebaseUser?.uid) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../../../lib/firebase');
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await updateDoc(userRef, {
+          certificates: updatedCertificates,
+          updatedAt: new Date()
+        });
+
+        console.log('Certificates updated successfully in Firebase');
+      }
+
+      setIsCertificatesSectionModalOpen(false);
+      announceToScreenReader('Certificates updated successfully');
+    } catch (error) {
+      console.error('Error saving certificates:', error);
+      announceToScreenReader('Failed to save certificates');
+      alert('Failed to save certificates. Please try again.');
+    }
+  }, [announceToScreenReader, firebaseUser]);
 
   const editModalHandler = useCallback(async (data: any) => {
     try {
@@ -1110,7 +1397,7 @@ const Profile: React.FC = React.memo(() => {
               {isOwner && (
                 <button
                   className="edit-profile-button"
-                  onClick={handleEditProfile}
+                  onClick={handleEditPersonalDetails}
                   aria-label="Edit profile"
                   type="button"
                 >
@@ -1159,6 +1446,14 @@ const Profile: React.FC = React.memo(() => {
           </div>
         </header>
 
+        {/* Track Best Section */}
+        <TrackBestSection
+          trackBest={trackBest}
+          sport={getDisplayValue(personalDetails.sport)}
+          isOwner={isOwner}
+          onEditSection={handleEditTrackBest}
+        />
+
         {/* Personal Details Section */}
         <section className="personal-details" aria-labelledby="personal-details-heading">
           <div className="section-header">
@@ -1166,7 +1461,7 @@ const Profile: React.FC = React.memo(() => {
             {isOwner && (
               <button
                 className="section-edit-button"
-                onClick={handleEditProfile}
+                onClick={handleEditPersonalDetails}
                 aria-label="Edit personal details"
                 type="button"
               >
@@ -1338,6 +1633,93 @@ const Profile: React.FC = React.memo(() => {
               onSave={editModalHandler}
               onClose={() => setIsEditModalOpen(false)}
               initialTab={editModalInitialTab as any}
+            />
+          </Suspense>
+        )}
+
+        {/* Personal Details Modal */}
+        {isPersonalDetailsModalOpen && (
+          <Suspense fallback={
+            <div className="modal-loading" role="status" aria-label="Loading personal details modal">
+              <div className="loading-spinner" aria-hidden="true"></div>
+              <p>Loading editor...</p>
+            </div>
+          }>
+            <PersonalDetailsModal
+              isOpen={isPersonalDetailsModalOpen}
+              personalDetails={personalDetails}
+              currentRole={currentRole}
+              onSave={handleSavePersonalDetails}
+              onClose={() => setIsPersonalDetailsModalOpen(false)}
+            />
+          </Suspense>
+        )}
+
+        {/* Physical Attributes Modal */}
+        {isPhysicalAttributesModalOpen && (
+          <Suspense fallback={
+            <div className="modal-loading" role="status" aria-label="Loading physical attributes modal">
+              <div className="loading-spinner" aria-hidden="true"></div>
+              <p>Loading editor...</p>
+            </div>
+          }>
+            <PhysicalAttributesModal
+              isOpen={isPhysicalAttributesModalOpen}
+              physicalAttributes={physicalAttributes}
+              onSave={handleSavePhysicalAttributes}
+              onClose={() => setIsPhysicalAttributesModalOpen(false)}
+            />
+          </Suspense>
+        )}
+
+        {/* Track Best Modal */}
+        {isTrackBestModalOpen && (
+          <Suspense fallback={
+            <div className="modal-loading" role="status" aria-label="Loading track best modal">
+              <div className="loading-spinner" aria-hidden="true"></div>
+              <p>Loading editor...</p>
+            </div>
+          }>
+            <TrackBestModal
+              isOpen={isTrackBestModalOpen}
+              trackBest={trackBest}
+              sport={getDisplayValue(personalDetails.sport) || 'cricket'}
+              onSave={handleSaveTrackBest}
+              onClose={() => setIsTrackBestModalOpen(false)}
+            />
+          </Suspense>
+        )}
+
+        {/* Achievements Section Modal */}
+        {isAchievementsSectionModalOpen && (
+          <Suspense fallback={
+            <div className="modal-loading" role="status" aria-label="Loading achievements modal">
+              <div className="loading-spinner" aria-hidden="true"></div>
+              <p>Loading editor...</p>
+            </div>
+          }>
+            <AchievementsSectionModal
+              isOpen={isAchievementsSectionModalOpen}
+              achievements={achievements}
+              onSave={handleSaveAchievements}
+              onClose={() => setIsAchievementsSectionModalOpen(false)}
+            />
+          </Suspense>
+        )}
+
+        {/* Certificates Section Modal */}
+        {isCertificatesSectionModalOpen && (
+          <Suspense fallback={
+            <div className="modal-loading" role="status" aria-label="Loading certificates modal">
+              <div className="loading-spinner" aria-hidden="true"></div>
+              <p>Loading editor...</p>
+            </div>
+          }>
+            <CertificatesSectionModal
+              isOpen={isCertificatesSectionModalOpen}
+              certificates={certificates}
+              onSave={handleSaveCertificates}
+              onClose={() => setIsCertificatesSectionModalOpen(false)}
             />
           </Suspense>
         )}

@@ -16,106 +16,90 @@ import errorHandler from './utils/error/errorHandler';
 import './utils/logging/LoggingManager'; // Initialize centralized logging
 import './styles/global.css';
 import './styles/themes.css';
+import './styles/optimized.css';
 import './App.css';
 import './performance.css';
 
-// Lazy load components for better performance
+// Optimized lazy loading with preloading for critical routes
 const WelcomePage = React.lazy(() => import('./login_flow/components/WelcomePage'));
 const AboutPage = React.lazy(() => import('./login_flow/components/AboutPage'));
 const Login = React.lazy(() => import('./features/auth/Login'));
 const Signup = React.lazy(() => import('./features/auth/Signup'));
-const Home = React.lazy(() => import('./pages/home/Home'));
-const Profile = React.lazy(() => import('./features/profile/pages/Profile'));
-const Search = React.lazy(() => import('./pages/search/Search'));
-const AddPost = React.lazy(() => import('./pages/addpost/AddPost'));
-const Messages = React.lazy(() => import('./pages/messages/Messages'));
-const Events = React.lazy(() => import('./pages/events/Events'));
-const PostDetail = React.lazy(() => import('./pages/postdetail/PostDetail'));
-const StoryDetail = React.lazy(() => import('./features/stories/StoryDetail'));
-const StorySharePage = React.lazy(() => import('./features/stories/StorySharePage'));
-const VerificationPage = React.lazy(() => import('./pages/verification/VerificationPage'));
-const VideoVerificationPage = React.lazy(() => import('./features/profile/pages/VideoVerification'));
-const Settings = React.lazy(() => import('./features/settings/pages/Settings'));
-const MomentsPage = React.lazy(() => import('./pages/moments/MomentsPage'));
 
-// Athlete Onboarding Components
-const SportSelectionPage = React.lazy(() => import('./features/athlete-onboarding/components/SportSelectionPage'));
-const PositionSelectionPage = React.lazy(() => import('./features/athlete-onboarding/components/PositionSelectionPage'));
-const MultiSportPositionFlow = React.lazy(() => import('./features/athlete-onboarding/components/MultiSportPositionFlow'));
-const SubcategorySelectionPage = React.lazy(() => import('./features/athlete-onboarding/components/SubcategorySelectionPage'));
-const SpecializationPage = React.lazy(() => import('./features/athlete-onboarding/components/SpecializationPage'));
-const AthleteAboutPage = React.lazy(() => import('./features/athlete-onboarding/components/AthleteAboutPage'));
-const PersonalDetailsForm = React.lazy(() => import('./features/athlete-onboarding/components/PersonalDetailsForm'));
+// Core app components - preload after initial load
+const Home = React.lazy(() => import(/* webpackChunkName: "home" */ './pages/home/Home'));
+const Profile = React.lazy(() => import(/* webpackChunkName: "profile" */ './features/profile/pages/Profile'));
+const Search = React.lazy(() => import(/* webpackChunkName: "search" */ './pages/search/Search'));
+const AddPost = React.lazy(() => import(/* webpackChunkName: "addpost" */ './pages/addpost/AddPost'));
+const Messages = React.lazy(() => import(/* webpackChunkName: "messages" */ './pages/messages/Messages'));
 
-// Optimized loading component for Suspense fallback
-const LoadingSpinner: React.FC = () => (
-  <div style={{
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    transition: 'opacity 0.2s ease-in-out'
-  }}>
-    <div style={{
-      width: '32px',
-      height: '32px',
-      border: '3px solid var(--accent-primary)',
-      borderTop: '3px solid transparent',
-      borderRadius: '50%',
-      animation: 'spin 0.8s linear infinite'
-    }}></div>
+// Secondary features - load on demand
+const Events = React.lazy(() => import(/* webpackChunkName: "events" */ './pages/events/Events'));
+const PostDetail = React.lazy(() => import(/* webpackChunkName: "postdetail" */ './pages/postdetail/PostDetail'));
+const StoryDetail = React.lazy(() => import(/* webpackChunkName: "stories" */ './features/stories/StoryDetail'));
+const StorySharePage = React.lazy(() => import(/* webpackChunkName: "stories" */ './features/stories/StorySharePage'));
+const VerificationPage = React.lazy(() => import(/* webpackChunkName: "verification" */ './pages/verification/VerificationPage'));
+const VideoVerificationPage = React.lazy(() => import(/* webpackChunkName: "verification" */ './features/profile/pages/VideoVerification'));
+const Settings = React.lazy(() => import(/* webpackChunkName: "settings" */ './features/settings/pages/Settings'));
+const MomentsPage = React.lazy(() => import(/* webpackChunkName: "moments" */ './pages/moments/MomentsPage'));
+
+// Athlete Onboarding - separate chunk
+const SportSelectionPage = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/SportSelectionPage'));
+const PositionSelectionPage = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/PositionSelectionPage'));
+const MultiSportPositionFlow = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/MultiSportPositionFlow'));
+const SubcategorySelectionPage = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/SubcategorySelectionPage'));
+const SpecializationPage = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/SpecializationPage'));
+const AthleteAboutPage = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/AthleteAboutPage'));
+const PersonalDetailsForm = React.lazy(() => import(/* webpackChunkName: "onboarding" */ './features/athlete-onboarding/components/PersonalDetailsForm'));
+
+// Optimized loading component with minimal DOM and CSS
+const LoadingSpinner: React.FC = React.memo(() => (
+  <div className="loading-container">
+    <div className="loading-spinner" />
   </div>
-);
+));
+
+// Preload critical chunks after initial render
+const preloadCriticalChunks = () => {
+  // Preload home and profile chunks as they're most likely to be accessed
+  import(/* webpackChunkName: "home" */ './pages/home/Home');
+  import(/* webpackChunkName: "profile" */ './features/profile/pages/Profile');
+};
 
 function AppContent(): React.JSX.Element {
   const location = useLocation();
 
   useEffect(() => {
-    // Conservative cache management - prevent infinite reload
-    const manageCache = (): void => {
-      const currentVersion = '2.1.0';
+    // Optimized initialization
+    const initializeApp = async (): Promise<void> => {
+      const currentVersion = '2.1.1';
       
-      console.log('APP: Starting conservative cache management...');
+      // Set document title immediately
+      document.title = 'AmaPlayer - Sports Social Media Platform';
       
-      // Set document title
-      document.title = 'AmaPlayer - Sports Social Media Platform v2.1';
-      
-      // Set version in localStorage (don't clear everything)
+      // Version management (non-blocking)
       try {
         const storedVersion = localStorage.getItem('amaplayer-version');
         if (!storedVersion || storedVersion !== currentVersion) {
           localStorage.setItem('amaplayer-version', currentVersion);
-          console.log('APP: Updated version to', currentVersion);
         }
       } catch (e) {
         // Silently handle localStorage errors
       }
       
-      // Only clear service workers if they exist
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          if (registrations.length > 0) {
-            console.log('APP: Clearing service workers...');
-            registrations.forEach(registration => registration.unregister());
-          }
-        });
-      }
+      // Preload critical chunks after a short delay
+      setTimeout(preloadCriticalChunks, 1000);
     };
     
-    // Run cache management
-    manageCache();
+    initializeApp();
     
-    // Register service worker for offline functionality - Phase 1
-    registerSW({
-      onSuccess: () => {
-        errorHandler.logError(new Error('Service worker registered successfully'), 'ServiceWorker', 'info');
-      },
-      onUpdate: () => {
-        errorHandler.logError(new Error('New version available'), 'ServiceWorker-Update', 'info');
-      }
-    });
+    // Register service worker (non-blocking)
+    setTimeout(() => {
+      registerSW({
+        onSuccess: () => console.log('SW: Registered successfully'),
+        onUpdate: () => console.log('SW: Update available')
+      });
+    }, 2000);
   }, []);
 
   return (
