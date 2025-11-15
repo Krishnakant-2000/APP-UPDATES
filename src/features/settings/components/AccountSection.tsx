@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Camera, Save, X, LogOut } from 'lucide-react';
+import { User, Mail, Camera, Save, X, LogOut, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import FormField from '../../../components/common/forms/FormField';
 import LoadingSpinner from '../../../components/common/ui/LoadingSpinner';
 import ToastContainer from '../../../components/common/ui/ToastContainer';
@@ -18,6 +20,11 @@ interface AccountFormData {
   photoURL: string;
 }
 
+interface UserNameData {
+  displayNameChanges: number;
+  originalDisplayName: string;
+}
+
 const AccountSection: React.FC = () => {
   const { currentUser, updateUserProfile, logout } = useAuth();
   const { toasts, showSuccess, showError } = useToast();
@@ -26,6 +33,8 @@ const AccountSection: React.FC = () => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [nameChangeCount, setNameChangeCount] = useState<number>(0);
+  const [originalName, setOriginalName] = useState<string>('');
 
   const form = useSettingsForm<AccountFormData>({
     initialValues: {
@@ -52,6 +61,28 @@ const AccountSection: React.FC = () => {
     }
   });
 
+  // Load user's name change data
+  useEffect(() => {
+    const loadNameChangeData = async () => {
+      if (!currentUser?.uid) return;
+
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setNameChangeCount(userData.displayNameChanges || 0);
+          setOriginalName(userData.displayName || currentUser.displayName || '');
+        }
+      } catch (error) {
+        console.error('Error loading name change data:', error);
+      }
+    };
+
+    loadNameChangeData();
+  }, [currentUser]);
+
   // Update form when user data changes
   useEffect(() => {
     if (currentUser) {
@@ -62,12 +93,67 @@ const AccountSection: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      const success = await form.save();
-      if (!success) {
-        showError('Validation Error', 'Please fix the errors before saving.');
+      // Check if name has changed
+      const newDisplayName = form.values.displayName.trim();
+      const currentDisplayName = currentUser?.displayName || '';
+      const nameHasChanged = newDisplayName !== currentDisplayName;
+
+      // If name hasn't changed, just save normally
+      if (!nameHasChanged) {
+        const success = await form.save();
+        if (!success) {
+          showError('Validation Error', 'Please fix the errors before saving.');
+        }
+        return;
+      }
+
+      // Check if user has reached the limit
+      if (nameChangeCount >= 2) {
+        showError('Limit Reached', 'You have already changed your display name 2 times. No more changes allowed.');
+        return;
+      }
+
+      // Confirm the name change
+      const confirmed = await showConfirmation({
+        title: 'Change Display Name',
+        message: `You are about to change your display name to "${newDisplayName}". You can only change your name ${2 - nameChangeCount} more time(s). Continue?`,
+        confirmText: 'Change Name',
+        cancelText: 'Cancel',
+        variant: 'warning'
+      });
+
+      if (!confirmed) {
+        hideConfirmation();
+        return;
+      }
+
+      // Save and update the change counter in Firestore
+      if (currentUser?.uid) {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userDocRef, {
+          displayName: newDisplayName,
+          displayNameChanges: nameChangeCount + 1,
+          updatedAt: new Date()
+        });
+
+        // Update Firebase Auth profile
+        await updateUserProfile({
+          displayName: newDisplayName,
+          photoURL: form.values.photoURL
+        });
+
+        // Update local state
+        setNameChangeCount(nameChangeCount + 1);
+        setOriginalName(newDisplayName);
+
+        showSuccess('Name Changed', `Your display name has been changed to "${newDisplayName}". You have ${2 - (nameChangeCount + 1)} change(s) remaining.`);
+        setIsEditing(false);
+        hideConfirmation();
       }
     } catch (error) {
+      console.error('Save error:', error);
       showError('Save Failed', 'Failed to update profile. Please try again.');
+      hideConfirmation();
     }
   };
 
@@ -173,30 +259,49 @@ const AccountSection: React.FC = () => {
 
         <div className="account-fields">
           {isEditing ? (
-            <FormField
-              label="Display Name"
-              name="displayName"
-              required
-              error={form.errors.displayName}
-              success={form.fields.displayName?.dirty && !form.errors.displayName ? 'Looks good!' : undefined}
-            >
-              <input
-                id="displayName"
-                type="text"
-                value={form.values.displayName}
-                onChange={(e) => form.setValue('displayName', e.target.value)}
-                onBlur={() => form.markFieldTouched('displayName')}
-                placeholder="Enter your display name"
-                disabled={form.isSaving}
-              />
-            </FormField>
+            <>
+              <FormField
+                label="Display Name"
+                name="displayName"
+                required
+                error={form.errors.displayName}
+                success={form.fields.displayName?.dirty && !form.errors.displayName ? 'Looks good!' : undefined}
+              >
+                <input
+                  id="displayName"
+                  type="text"
+                  value={form.values.displayName}
+                  onChange={(e) => form.setValue('displayName', e.target.value)}
+                  onBlur={() => form.markFieldTouched('displayName')}
+                  placeholder="Enter your display name"
+                  disabled={form.isSaving}
+                />
+              </FormField>
+              {nameChangeCount < 2 && (
+                <div className="name-change-warning">
+                  <AlertCircle size={16} />
+                  <span>You have {2 - nameChangeCount} name change{(2 - nameChangeCount) > 1 ? 's' : ''} remaining.</span>
+                </div>
+              )}
+              {nameChangeCount >= 2 && (
+                <div className="name-change-warning error">
+                  <AlertCircle size={16} />
+                  <span>You have used all your name changes. You cannot change your display name anymore.</span>
+                </div>
+              )}
+            </>
           ) : (
             <div className="field-group">
               <label className="field-label">
                 <User size={16} />
                 Display Name
               </label>
-              <div className="field-value">{currentUser?.displayName || 'Not set'}</div>
+              <div className="field-value">
+                {currentUser?.displayName || 'Not set'}
+                <span className="name-change-info">
+                  ({2 - nameChangeCount} change{(2 - nameChangeCount) !== 1 ? 's' : ''} remaining)
+                </span>
+              </div>
             </div>
           )}
 

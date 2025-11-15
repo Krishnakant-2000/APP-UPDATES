@@ -773,9 +773,19 @@
   z-index: 1;
 }
 
+/* Flip the athlete icon (running person) to face right */
+.role-option:first-child .role-icon {
+  transform: scaleX(-1);
+}
+
 .role-option:hover .role-icon {
   transform: scale(1.25) rotate(5deg);
   filter: drop-shadow(0 0 8px rgba(255, 20, 147, 0.3));
+}
+
+/* Maintain flip on hover for athlete icon */
+.role-option:first-child:hover .role-icon {
+  transform: scaleX(-1) scale(1.25) rotate(5deg);
 }
 
 .role-option h4 {

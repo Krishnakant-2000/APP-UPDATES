@@ -67,6 +67,26 @@ const Profile: React.FC = React.memo(() => {
     return undefined;
   };
 
+  // Format date to dd-mm-yyyy
+  const formatDateOfBirth = (dateString: string | undefined): string => {
+    if (!dateString) return 'Not specified';
+
+    try {
+      // Check if date is in YYYY-MM-DD format
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (dateRegex.test(dateString)) {
+        const [year, month, day] = dateString.split('-');
+        return `${day}-${month}-${year}`;
+      }
+
+      // If it's already in dd-mm-yyyy or another format, return as is
+      return dateString;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return dateString;
+    }
+  };
+
   const [personalDetails, setPersonalDetails] = useState<PersonalDetails>({
     name: 'Loading...'
   });
@@ -465,6 +485,20 @@ const Profile: React.FC = React.memo(() => {
           updatedAt: new Date()
         });
 
+        // Clear sport-related localStorage for organizations and coaches
+        // to prevent showing athlete-specific data
+        if (newRole === 'organization' || newRole === 'coaches') {
+          localStorage.removeItem('userSport');
+          localStorage.removeItem('userPosition');
+          localStorage.removeItem('userPlayerType');
+        }
+        if (newRole === 'organization') {
+          localStorage.removeItem('userSpecializations');
+        }
+
+        // Update role in localStorage
+        localStorage.setItem('userRole', newRole);
+
         // Dispatch custom event to notify other components about role change
         window.dispatchEvent(new CustomEvent('userProfileUpdated', {
           detail: { role: newRole }
@@ -860,6 +894,11 @@ const Profile: React.FC = React.memo(() => {
         await updateDoc(userRef, cleanedUpdateData);
 
         console.log('Personal details updated successfully in Firebase');
+
+        // Dispatch custom event to notify other components about profile update
+        window.dispatchEvent(new CustomEvent('userProfileUpdated', {
+          detail: { personalDetails: updatedPersonalDetails }
+        }));
       }
 
       setIsPersonalDetailsModalOpen(false);
@@ -1446,13 +1485,15 @@ const Profile: React.FC = React.memo(() => {
           </div>
         </header>
 
-        {/* Track Best Section */}
-        <TrackBestSection
-          trackBest={trackBest}
-          sport={getDisplayValue(personalDetails.sport)}
-          isOwner={isOwner}
-          onEditSection={handleEditTrackBest}
-        />
+        {/* Track Best Section - Only for Athletes/Players and Parents */}
+        {(currentRole === 'athlete' || currentRole === 'parents') && (
+          <TrackBestSection
+            trackBest={trackBest}
+            sport={getDisplayValue(personalDetails.sport)}
+            isOwner={isOwner}
+            onEditSection={handleEditTrackBest}
+          />
+        )}
 
         {/* Personal Details Section */}
         <section className="personal-details" aria-labelledby="personal-details-heading">
@@ -1476,7 +1517,7 @@ const Profile: React.FC = React.memo(() => {
             </div>
             <div className="field-row">
               <span className="field-label" id="dob-label">DATE OF BIRTH</span>
-              <span className="field-value" aria-labelledby="dob-label">{personalDetails.dateOfBirth || 'Not specified'}</span>
+              <span className="field-value" aria-labelledby="dob-label">{formatDateOfBirth(personalDetails.dateOfBirth)}</span>
             </div>
             <div className="field-row">
               <span className="field-label" id="gender-label">GENDER</span>
@@ -1501,24 +1542,6 @@ const Profile: React.FC = React.memo(() => {
             <div className="field-row">
               <span className="field-label" id="country-label">COUNTRY</span>
               <span className="field-value" aria-labelledby="country-label">{personalDetails.country || 'Not specified'}</span>
-            </div>
-            <div className="field-row">
-              <span className="field-label" id="player-type-label">PLAYER TYPE</span>
-              <span className="field-value" aria-labelledby="player-type-label">
-                {getDisplayValue(personalDetails.playerType) || 'Not specified'}
-              </span>
-            </div>
-            <div className="field-row">
-              <span className="field-label" id="sport-label">SPORT</span>
-              <span className="field-value" aria-labelledby="sport-label">
-                {getDisplayValue(personalDetails.sport) || 'Not specified'}
-              </span>
-            </div>
-            <div className="field-row">
-              <span className="field-label" id="position-label">POSITION</span>
-              <span className="field-value" aria-labelledby="position-label">
-                {getDisplayValue(personalDetails.position) || 'Not specified'}
-              </span>
             </div>
             <div className="field-row">
               <span className="field-label" id="role-label">ACCOUNT TYPE</span>

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { UserRole, PersonalDetails, roleConfigurations } from '../types/ProfileTypes';
 import '../styles/SectionModal.css';
 
@@ -22,9 +25,11 @@ const PersonalDetailsModal: React.FC<PersonalDetailsModalProps> = ({
   currentRole,
   personalDetails
 }) => {
+  const { currentUser } = useAuth();
   const [formData, setFormData] = useState<PersonalDetails>(personalDetails);
   const [errors, setErrors] = useState<FormErrors>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isCheckingName, setIsCheckingName] = useState(false);
 
   // Update form data when props change
   useEffect(() => {
@@ -51,36 +56,82 @@ const PersonalDetailsModal: React.FC<PersonalDetailsModalProps> = ({
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
     const roleConfig = roleConfigurations[currentRole];
-    
+
     // Validate required fields based on role
     roleConfig.editableFields.forEach(field => {
       const value = formData[field as keyof PersonalDetails];
-      
+
       if (field === 'name' && (!value || String(value).trim() === '')) {
         newErrors[field] = 'Name is required';
       }
-      
-      if (field === 'contactEmail' && value && String(value).trim() !== '') {
+
+      if ((field === 'email' || field === 'contactEmail') && value && String(value).trim() !== '') {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(String(value))) {
           newErrors[field] = 'Please enter a valid email address';
         }
       }
-      
+
       if (field === 'yearsExperience' && value && Number(value) < 0) {
         newErrors[field] = 'Years of experience cannot be negative';
       }
     });
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  // Function to check if name is unique
+  const checkNameUnique = async (name: string): Promise<boolean> => {
+    try {
+      setIsCheckingName(true);
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('name', '==', name.trim()));
+      const querySnapshot = await getDocs(q);
+
+      // If no results, name is unique
+      if (querySnapshot.empty) {
+        return true;
+      }
+
+      // If results exist, check if it's the current user's own name
+      for (const docSnap of querySnapshot.docs) {
+        if (docSnap.id !== currentUser?.uid) {
+          return false; // Name is taken by another user
+        }
+      }
+
+      return true; // It's the user's own current name
+    } catch (error) {
+      console.error('Error checking name uniqueness:', error);
+      return false;
+    } finally {
+      setIsCheckingName(false);
+    }
+  };
+
+  const handleSave = async () => {
     if (!validateForm()) {
       return;
     }
-    
+
+    // Check if name has changed
+    const newName = formData.name?.trim() || '';
+    const currentName = personalDetails.name?.trim() || '';
+    const nameHasChanged = newName !== currentName;
+
+    // If name has changed, check if it's unique
+    if (nameHasChanged && newName) {
+      const isUnique = await checkNameUnique(newName);
+      if (!isUnique) {
+        setErrors(prev => ({
+          ...prev,
+          name: 'This name is already taken by another user. Please choose a different name.'
+        }));
+        return;
+      }
+    }
+
     onSave(formData);
     setHasUnsavedChanges(false);
     onClose();
@@ -143,7 +194,7 @@ const PersonalDetailsModal: React.FC<PersonalDetailsModalProps> = ({
       website: 'Enter website URL',
       specializations: 'Enter specializations separated by commas'
     };
-    
+
     return placeholders[field] || `Enter ${getFieldLabel(field).toLowerCase()}`;
   };
 

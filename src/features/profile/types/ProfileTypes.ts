@@ -158,25 +158,25 @@ export const roleConfigurations: Record<UserRole, RoleConfig> = {
   athlete: {
     role: 'athlete',
     sections: ['personal', 'physicalAttributes', 'achievements', 'certificates', 'talentVideos', 'posts'],
-    editableFields: ['name', 'dateOfBirth', 'gender', 'mobile', 'email', 'city', 'district', 'state', 'playerType', 'sport', 'position'],
-    displayName: 'Athlete'
+    editableFields: ['name', 'dateOfBirth', 'gender', 'mobile', 'email', 'city', 'state', 'country'],
+    displayName: 'Player'
   },
   organization: {
     role: 'organization',
     sections: ['personal', 'organizationInfo', 'certificates', 'posts'],
-    editableFields: ['organizationName', 'organizationType', 'location', 'contactEmail', 'website'],
+    editableFields: ['name', 'dateOfBirth', 'gender', 'mobile', 'email', 'city', 'state', 'country'],
     displayName: 'Organization'
   },
   parents: {
     role: 'parents',
     sections: ['personal', 'connectedAthletes', 'posts'],
-    editableFields: ['name', 'relationship', 'contactEmail'],
+    editableFields: ['name', 'dateOfBirth', 'gender', 'mobile', 'email', 'city', 'state', 'country'],
     displayName: 'Parent'
   },
   coaches: {
     role: 'coaches',
     sections: ['personal', 'coachingInfo', 'certificates', 'posts'],
-    editableFields: ['name', 'specializations', 'yearsExperience', 'coachingLevel'],
+    editableFields: ['name', 'dateOfBirth', 'gender', 'mobile', 'email', 'city', 'state', 'country'],
     displayName: 'Coach'
   }
 };

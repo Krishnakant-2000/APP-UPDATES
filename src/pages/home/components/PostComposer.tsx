@@ -163,13 +163,22 @@ const PostComposer: React.FC<PostComposerProps> = ({
       // Helper function to safely get localStorage value (avoids undefined/empty string)
       const getSafeValue = (key: string): string | null => {
         const value = localStorage.getItem(key);
-        return value && value.trim() !== '' ? value : null;
+        return value && value.trim() !== '' && value !== '[object Object]' ? value : null;
+      };
+
+      // Helper to extract string from object or string
+      const extractString = (value: any): string | null => {
+        if (!value) return null;
+        if (typeof value === 'string') return value !== '[object Object]' ? value : null;
+        if (typeof value === 'object' && value !== null && 'name' in value) return value.name;
+        return null;
       };
 
       const userSport = getSafeValue('userSport');
       const userPosition = getSafeValue('userPosition');
       const userPlayerType = getSafeValue('userPlayerType');
       const userOrganizationType = getSafeValue('userOrganizationType');
+      const userDisplayName = getSafeValue('userDisplayName') || currentUser.displayName || 'Anonymous User';
       const userSpecializationsStr = getSafeValue('userSpecializations');
       const userSpecializations = userSpecializationsStr
         ? JSON.parse(userSpecializationsStr)
@@ -178,7 +187,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
       // Create post document with all required fields
       const postData: any = {
         userId: currentUser.uid,
-        userDisplayName: currentUser.displayName || 'Anonymous User',
+        userDisplayName: userDisplayName,
         userPhotoURL: currentUser.photoURL || null,
         userRole: userRole,
         caption: text,

@@ -55,14 +55,13 @@ const SportBanner: React.FC<SportBannerProps> = ({
         if (sport) athleteParts.push(sport);
         if (position) athleteParts.push(position);
         if (playerType && playerType !== 'Not specified') athleteParts.push(playerType);
-        // If no data, show default athlete label
-        return athleteParts.length > 0 ? athleteParts.join(' • ') : 'Athlete';
+        // If no data, show default player label
+        return athleteParts.length > 0 ? athleteParts.join(' • ') : 'Player';
       }
 
       case 'coaches': {
-        const coachParts = [];
-        if (sport) coachParts.push(`${sport} Coach`);
-        else coachParts.push('Coach');
+        const coachParts = ['Coach'];
+        // Only show specializations for coaches, NOT sport
         if (specializations && specializations.length > 0) {
           coachParts.push(specializations.slice(0, 2).join(', '));
         }
@@ -71,10 +70,13 @@ const SportBanner: React.FC<SportBannerProps> = ({
 
       case 'organization': {
         const orgParts = [];
-        if (organizationType) orgParts.push(organizationType);
-        if (sport) orgParts.push(sport);
-        // If no data, show default organization label
-        return orgParts.length > 0 ? orgParts.join(' • ') : 'Organization';
+        if (organizationType) {
+          orgParts.push(organizationType);
+        } else {
+          orgParts.push('Organization');
+        }
+        // Organizations should NOT show sport
+        return orgParts.join(' • ');
       }
 
       case 'parents':

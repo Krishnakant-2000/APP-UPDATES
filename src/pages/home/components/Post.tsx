@@ -107,6 +107,17 @@ const Post: React.FC<PostProps> = ({
   // State to track user profile data from Firebase
   const [userProfileData, setUserProfileData] = useState<any>(null);
 
+  // Helper function to safely extract string value from object or string
+  const getStringValue = (value: any): string | null => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && value !== null) {
+      if ('name' in value) return value.name;
+      if ('id' in value && 'name' in value) return value.name;
+    }
+    return null;
+  };
+
   // Fetch user profile data from Firebase for current user's posts
   useEffect(() => {
     let isMounted = true;
@@ -117,11 +128,38 @@ const Post: React.FC<PostProps> = ({
           const userData = await userService.getById(currentUser.uid);
           if (isMounted && userData) {
             setUserProfileData(userData);
-            // Also update localStorage for immediate access
-            if (userData.role) localStorage.setItem('userRole', userData.role);
-            if (userData.sports && userData.sports[0]) localStorage.setItem('userSport', userData.sports[0]);
-            if (userData.position) localStorage.setItem('userPosition', userData.position);
-            if (userData.specializations) localStorage.setItem('userSpecializations', JSON.stringify(userData.specializations));
+            // Also update localStorage for immediate access - safely extract string values
+            // Cast to any to access extended user properties
+            const userDataAny = userData as any;
+
+            if (userDataAny.role) localStorage.setItem('userRole', userDataAny.role);
+
+            // Handle display name - use organizationName for organizations, otherwise use displayName or name
+            const displayName = userDataAny.role === 'organization'
+              ? (userDataAny.organizationName || userDataAny.displayName || userDataAny.name)
+              : (userDataAny.displayName || userDataAny.name);
+            if (displayName) localStorage.setItem('userDisplayName', displayName);
+
+            // Handle sport - could be string or array of objects
+            const sport = Array.isArray(userDataAny.sports)
+              ? getStringValue(userDataAny.sports[0])
+              : getStringValue(userDataAny.sport);
+            if (sport) localStorage.setItem('userSport', sport);
+
+            // Handle position - could be object or string
+            const position = getStringValue(userDataAny.position) || getStringValue(userDataAny.positionName);
+            if (position) localStorage.setItem('userPosition', position);
+
+            // Handle playerType - could be object or string
+            const playerType = getStringValue(userDataAny.playerType);
+            if (playerType) localStorage.setItem('userPlayerType', playerType);
+
+            // Handle organization type
+            const orgType = getStringValue(userDataAny.organizationType);
+            if (orgType) localStorage.setItem('userOrganizationType', orgType);
+
+            // Handle specializations
+            if (userDataAny.specializations) localStorage.setItem('userSpecializations', JSON.stringify(userDataAny.specializations));
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
@@ -145,24 +183,55 @@ const Post: React.FC<PostProps> = ({
   }, [isCurrentUserPost, currentUser]);
 
   // Get current profile data - use Firebase data for current user, post data for others
-  const currentRole = isCurrentUserPost && userProfileData
-    ? (userProfileData.role || post.userRole || 'athlete')
+  // Always extract string values to prevent [object Object] display
+  const profileData = userProfileData as any;
+
+  const currentRole = isCurrentUserPost && profileData
+    ? (profileData.role || post.userRole || 'athlete')
     : (post.userRole || 'athlete');
-  const currentSport = isCurrentUserPost && userProfileData
-    ? (userProfileData.sports?.[0] || post.userSport)
-    : post.userSport;
-  const currentPosition = isCurrentUserPost && userProfileData
-    ? (userProfileData.position || post.userPosition)
-    : post.userPosition;
-  const currentPlayerType = isCurrentUserPost && userProfileData
-    ? (userProfileData.playerType || post.userPlayerType)
-    : post.userPlayerType;
-  const currentOrganizationType = isCurrentUserPost && userProfileData
-    ? (userProfileData.organizationType || post.userOrganizationType)
-    : post.userOrganizationType;
-  const currentSpecializations = isCurrentUserPost && userProfileData
-    ? (userProfileData.specializations || post.userSpecializations)
-    : post.userSpecializations;
+
+  // Only show sport/position/playerType for athletes and parents
+  // Organizations should NOT show sport, coaches should only show specializations
+  const shouldShowSportData = currentRole === 'athlete' || currentRole === 'parent';
+
+  const currentSport = shouldShowSportData
+    ? (isCurrentUserPost && profileData
+        ? (getStringValue(Array.isArray(profileData.sports) ? profileData.sports[0] : profileData.sport) || getStringValue(post.userSport))
+        : getStringValue(post.userSport))
+    : undefined;
+
+  const currentPosition = shouldShowSportData && currentRole === 'athlete'
+    ? (isCurrentUserPost && profileData
+        ? (getStringValue(profileData.position) || getStringValue(profileData.positionName) || getStringValue(post.userPosition))
+        : getStringValue(post.userPosition))
+    : undefined;
+
+  const currentPlayerType = shouldShowSportData && currentRole === 'athlete'
+    ? (isCurrentUserPost && profileData
+        ? (getStringValue(profileData.playerType) || getStringValue(post.userPlayerType))
+        : getStringValue(post.userPlayerType))
+    : undefined;
+
+  const currentOrganizationType = currentRole === 'organization'
+    ? (isCurrentUserPost && profileData
+        ? (getStringValue(profileData.organizationType) || getStringValue(post.userOrganizationType))
+        : getStringValue(post.userOrganizationType))
+    : undefined;
+
+  const currentSpecializations = (currentRole === 'coaches' || currentRole === 'coach')
+    ? (isCurrentUserPost && profileData
+        ? (profileData.specializations || post.userSpecializations)
+        : post.userSpecializations)
+    : undefined;
+
+  // Fix display name in case it's showing [object Object]
+  const displayName = isCurrentUserPost && profileData
+    ? (profileData.role === 'organization'
+        ? (profileData.organizationName || profileData.displayName || profileData.name)
+        : (profileData.displayName || profileData.name))
+    : (typeof post.userDisplayName === 'string' && post.userDisplayName !== '[object Object]'
+        ? post.userDisplayName
+        : 'User');
 
   return (
     <div className="post" data-testid={`post-${post.id}`}>
@@ -174,7 +243,7 @@ const Post: React.FC<PostProps> = ({
               onClick={handleUserClick}
               style={{ cursor: 'pointer' }}
             >
-              {post.userDisplayName}
+              {displayName}
             </h3>
             <SportBanner 
               role={currentRole as any} 
@@ -440,7 +509,7 @@ const Post: React.FC<PostProps> = ({
                   style={{ cursor: 'pointer' }}
                   className="post-username-clickable"
                 >
-                  {post.userDisplayName}
+                  {displayName}
                 </strong> {post.caption}
                 {(post as any).editedAt && (
                   <span className="edited-indicator"> (edited)</span>

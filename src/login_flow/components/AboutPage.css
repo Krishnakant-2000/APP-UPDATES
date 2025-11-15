@@ -578,3 +578,150 @@
     font-size: 1.1rem;
   }
 }
+
+/* Coach Professional Details Form Styles */
+.coach-details-form {
+  width: 100%;
+  max-width: 900px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: 20px;
+  padding: 3rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-primary);
+}
+
+.form-section-title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+  text-align: center;
+  background: linear-gradient(45deg, var(--text-primary), var(--accent-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.form-label .required {
+  color: #ff1493;
+  font-size: 0.9rem;
+}
+
+.form-input {
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(255, 20, 147, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.6;
+}
+
+select.form-input {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff1493' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 3rem;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+select.form-input option {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 0.5rem;
+}
+
+/* Force proper colors for select options in dark mode */
+[data-theme="dark"] select.form-input,
+.dark-theme select.form-input {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] select.form-input option,
+.dark-theme select.form-input option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+}
+
+/* Responsive adjustments for form */
+@media (max-width: 768px) {
+  .coach-details-form {
+    padding: 2rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .form-section-title {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .coach-details-form {
+    padding: 1.5rem;
+  }
+
+  .form-section-title {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-input {
+    padding: 0.875rem;
+  }
+
+  .form-label {
+    font-size: 0.95rem;
+  }
+}

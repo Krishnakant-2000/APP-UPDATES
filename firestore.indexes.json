@@ -11,6 +11,13 @@
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "isVerified", "order": "DESCENDING" },
         { "fieldPath": "followersCount", "order": "DESCENDING" }
       ]

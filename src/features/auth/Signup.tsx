@@ -16,8 +16,23 @@ export default function Signup() {
   const { signup, googleLogin, appleLogin, currentUser } = useAuth();
   const navigate = useNavigate();
 
-  // Load full name from personal details if available
+  // Load full name from personal details or coach details if available
   useEffect(() => {
+    // First check for coach professional details
+    const coachDetails = localStorage.getItem('coachProfessionalDetails');
+    if (coachDetails) {
+      try {
+        const details = JSON.parse(coachDetails);
+        if (details.fullName) {
+          setDisplayName(details.fullName);
+          return; // Exit early if we found coach details
+        }
+      } catch (err) {
+        console.error('Error parsing coach professional details:', err);
+      }
+    }
+
+    // Fall back to pending personal details (for athletes)
     const pendingDetails = localStorage.getItem('pendingPersonalDetails');
     if (pendingDetails) {
       try {
@@ -41,6 +56,37 @@ export default function Signup() {
     if (!user) return;
 
     const userService = (await import('../../services/api/userService')).default;
+
+    // Check for coach professional details and save them
+    const coachDetails = localStorage.getItem('coachProfessionalDetails');
+    if (coachDetails) {
+      try {
+        const details = JSON.parse(coachDetails);
+
+        // Build coach profile data object
+        const profileData: any = {
+          displayName: details.fullName || '',
+          userRole: 'coach',
+          email: details.email || user.email,
+        };
+
+        // Add optional coach-specific fields
+        if (details.phone) profileData.mobile = details.phone;
+        if (details.bio) profileData.bio = details.bio;
+        if (details.sport) profileData.sport = details.sport;
+        if (details.yearsOfExperience) profileData.yearsOfExperience = details.yearsOfExperience;
+        if (details.coachingLevel) profileData.coachingLevel = details.coachingLevel;
+        if (details.certifications) profileData.certifications = details.certifications;
+
+        await userService.updateUserProfile(user.uid, profileData);
+
+        localStorage.removeItem('coachProfessionalDetails');
+        console.log('✅ Coach professional details saved after signup');
+      } catch (err) {
+        console.error('Error saving coach professional details:', err);
+      }
+      return; // Exit early if we processed coach details
+    }
 
     // Check for pending athlete profile and save it
     const pendingAthleteProfile = localStorage.getItem('pendingAthleteProfile');

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import useTranslation from '../hooks/useTranslation';
 import ThemeToggle from '../../components/common/ui/ThemeToggle';
 import LanguageSelector from '../../components/common/forms/LanguageSelector';
+import { SPORTS_CONFIG } from '../../features/athlete-onboarding/data/sportsConfig';
 import videoSource from '../assets/video/sport.mp4';
 import './AboutPage.css';
 
@@ -19,6 +20,18 @@ const AboutPage: React.FC = () => {
   const navigate = useNavigate();
   const { role } = useParams<{ role: string }>();
   const { t } = useTranslation();
+
+  // Coach professional details form state
+  const [coachDetails, setCoachDetails] = useState({
+    fullName: '',
+    sport: '',
+    yearsOfExperience: '',
+    coachingLevel: '',
+    certifications: '',
+    bio: '',
+    phone: '',
+    email: ''
+  });
 
   const roleInfo: RoleInfoMap = {
     athlete: { 
@@ -45,8 +58,26 @@ const AboutPage: React.FC = () => {
 
   const currentRole = role ? roleInfo[role] : undefined;
 
+  const handleCoachDetailsChange = (field: string, value: string): void => {
+    setCoachDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   const handleContinue = (): void => {
-    navigate(`/login/${role}`);
+    // For coaches, validate and store their professional details
+    if (role === 'coach') {
+      // Store coach details in localStorage for later use during registration
+      localStorage.setItem('coachProfessionalDetails', JSON.stringify(coachDetails));
+      // Store the role for signup page
+      localStorage.setItem('selectedUserRole', role);
+      // Navigate to signup page instead of login
+      navigate('/signup');
+    } else {
+      // Other roles go to login
+      navigate(`/login/${role}`);
+    }
   };
 
   const handleBack = (): void => {
@@ -65,58 +96,193 @@ const AboutPage: React.FC = () => {
       <div className="about-content">
         <div className="about-header">
           <div className="role-badge">
-            <img 
-              src={currentRole?.image} 
-              alt={t(currentRole?.title || '')} 
-              className="role-badge-image" 
+            <img
+              src={currentRole?.image}
+              alt={t(currentRole?.title || '')}
+              className="role-badge-image"
             />
             <span className="role-badge-text">
               {t('joiningAs', 'Joining as')} {t(currentRole?.title || '')}
             </span>
           </div>
           <h1 className="about-title">{t('welcomeToAmaplayer')}</h1>
-          <p className="about-subtitle">{t('yourJourney')}</p>
+          <p className="about-subtitle">{role === 'coach' ? t('coachDetailsSubtitle', 'Please provide your professional details') : t('yourJourney')}</p>
         </div>
 
-        <div className="mission-vision-grid">
-          <div className="mission-card">
-            <div className="card-icon mission-icon">🎯</div>
-            <h3 className="card-title">{t('ourMission')}</h3>
-            <p className="card-description">
-              {t('missionDescription', "To create the world's most comprehensive platform that connects athletes, coaches, and organizations, fostering talent development and creating opportunities for athletic excellence across all sports disciplines.")}
-            </p>
-          </div>
+        {role === 'coach' ? (
+          // Coach Professional Details Form
+          <div className="coach-details-form">
+            <h2 className="form-section-title">{t('professionalDetails', 'Professional Details')}</h2>
 
-          <div className="vision-card">
-            <div className="card-icon vision-icon">🌟</div>
-            <h3 className="card-title">{t('ourVision')}</h3>
-            <p className="card-description">
-              {t('visionDescription', 'To revolutionize the sports industry by building a global ecosystem where every athlete has access to world-class coaching, every coach can discover exceptional talent, and every organization can build championship-winning teams.')}
-            </p>
-          </div>
-        </div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label htmlFor="fullName" className="form-label">
+                  {t('fullName', 'Full Name')} <span className="required">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="fullName"
+                  className="form-input"
+                  value={coachDetails.fullName}
+                  onChange={(e) => handleCoachDetailsChange('fullName', e.target.value)}
+                  placeholder={t('enterFullName', 'Enter your full name')}
+                />
+              </div>
 
-        <div className="video-section">
-          <h2 className="video-title">{t('watchOurStory')}</h2>
-          <div className="video-container">
-            <video 
-              width="100%" 
-              height="auto" 
-              controls 
-              controlsList="nodownload"
-              poster=""
-              className="about-video"
-            >
-              <source src={videoSource} type="video/mp4" />
-              <p>{t('videoLoadError', "If you're seeing this, the video failed to load. Please check the console for errors.")}</p>
-              {t('videoNotSupported', 'Your browser does not support the video tag.')}
-            </video>
+              <div className="form-group">
+                <label htmlFor="email" className="form-label">
+                  {t('email', 'Email')} <span className="required">*</span>
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  className="form-input"
+                  value={coachDetails.email}
+                  onChange={(e) => handleCoachDetailsChange('email', e.target.value)}
+                  placeholder={t('enterEmail', 'Enter your email')}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="phone" className="form-label">
+                  {t('phone', 'Phone Number')}
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  className="form-input"
+                  value={coachDetails.phone}
+                  onChange={(e) => handleCoachDetailsChange('phone', e.target.value)}
+                  placeholder={t('enterPhone', 'Enter your phone number')}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="sport" className="form-label">
+                  {t('sport', 'Sport')} <span className="required">*</span>
+                </label>
+                <select
+                  id="sport"
+                  className="form-input"
+                  value={coachDetails.sport}
+                  onChange={(e) => handleCoachDetailsChange('sport', e.target.value)}
+                >
+                  <option value="">{t('selectSport', 'Select sport')}</option>
+                  {SPORTS_CONFIG.map((sport) => (
+                    <option key={sport.id} value={sport.name}>
+                      {sport.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="yearsOfExperience" className="form-label">
+                  {t('yearsOfExperience', 'Years of Experience')} <span className="required">*</span>
+                </label>
+                <input
+                  type="number"
+                  id="yearsOfExperience"
+                  className="form-input"
+                  value={coachDetails.yearsOfExperience}
+                  onChange={(e) => handleCoachDetailsChange('yearsOfExperience', e.target.value)}
+                  placeholder={t('enterYears', 'Enter years')}
+                  min="0"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="coachingLevel" className="form-label">
+                  {t('coachingLevel', 'Coaching Level')} <span className="required">*</span>
+                </label>
+                <select
+                  id="coachingLevel"
+                  className="form-input"
+                  value={coachDetails.coachingLevel}
+                  onChange={(e) => handleCoachDetailsChange('coachingLevel', e.target.value)}
+                >
+                  <option value="">{t('selectLevel', 'Select level')}</option>
+                  <option value="beginner">{t('beginner', 'Beginner')}</option>
+                  <option value="intermediate">{t('intermediate', 'Intermediate')}</option>
+                  <option value="advanced">{t('advanced', 'Advanced')}</option>
+                  <option value="professional">{t('professional', 'Professional')}</option>
+                  <option value="elite">{t('elite', 'Elite/Olympic')}</option>
+                </select>
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="certifications" className="form-label">
+                  {t('certifications', 'Certifications')}
+                </label>
+                <input
+                  type="text"
+                  id="certifications"
+                  className="form-input"
+                  value={coachDetails.certifications}
+                  onChange={(e) => handleCoachDetailsChange('certifications', e.target.value)}
+                  placeholder={t('enterCertifications', 'e.g., UEFA A License, NASM-CPT')}
+                />
+              </div>
+
+              <div className="form-group full-width">
+                <label htmlFor="bio" className="form-label">
+                  {t('bio', 'Professional Bio')}
+                </label>
+                <textarea
+                  id="bio"
+                  className="form-input form-textarea"
+                  value={coachDetails.bio}
+                  onChange={(e) => handleCoachDetailsChange('bio', e.target.value)}
+                  placeholder={t('enterBio', 'Tell us about your coaching experience and philosophy')}
+                  rows={4}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          // Original vision/mission and video for other roles
+          <>
+            <div className="mission-vision-grid">
+              <div className="mission-card">
+                <div className="card-icon mission-icon">🎯</div>
+                <h3 className="card-title">{t('ourMission')}</h3>
+                <p className="card-description">
+                  {t('missionDescription', "To create the world's most comprehensive platform that connects athletes, coaches, and organizations, fostering talent development and creating opportunities for athletic excellence across all sports disciplines.")}
+                </p>
+              </div>
+
+              <div className="vision-card">
+                <div className="card-icon vision-icon">🌟</div>
+                <h3 className="card-title">{t('ourVision')}</h3>
+                <p className="card-description">
+                  {t('visionDescription', 'To revolutionize the sports industry by building a global ecosystem where every athlete has access to world-class coaching, every coach can discover exceptional talent, and every organization can build championship-winning teams.')}
+                </p>
+              </div>
+            </div>
+
+            <div className="video-section">
+              <h2 className="video-title">{t('watchOurStory')}</h2>
+              <div className="video-container">
+                <video
+                  width="100%"
+                  height="auto"
+                  controls
+                  controlsList="nodownload"
+                  poster=""
+                  className="about-video"
+                >
+                  <source src={videoSource} type="video/mp4" />
+                  <p>{t('videoLoadError', "If you're seeing this, the video failed to load. Please check the console for errors.")}</p>
+                  {t('videoNotSupported', 'Your browser does not support the video tag.')}
+                </video>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="about-actions">
           <button className="continue-btn" onClick={handleContinue}>
-            {t('continueToLogin')}
+            {role === 'coach' ? t('continue', 'Continue') : t('continueToLogin')}
           </button>
           <button className="back-btn" onClick={handleBack}>
             ← {t('chooseDifferentRole')}
