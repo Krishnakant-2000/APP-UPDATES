@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -12,11 +12,39 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Debug: Log if environment variables are loaded
+if (!firebaseConfig.apiKey) {
+  console.warn('Firebase API Key not found in environment variables. Please add REACT_APP_FIREBASE_API_KEY to .env file.');
+}
+if (!firebaseConfig.projectId) {
+  console.warn('Firebase Project ID not found in environment variables. Please add REACT_APP_FIREBASE_PROJECT_ID to .env file.');
+}
 
-// Export Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Initialize Firebase
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  // Don't throw - continue with graceful degradation
+}
+
+// Export Firebase services with error handling
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
+
+try {
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
+  console.log('Firebase services initialized successfully');
+} catch (error: any) {
+  console.error('Error initializing Firebase services:', error?.message || error);
+  // Create mock/null services to prevent crashes
+  console.warn('Firebase services unavailable - app will run in limited mode');
+}
+
+export { auth, db, storage };
 export default app;

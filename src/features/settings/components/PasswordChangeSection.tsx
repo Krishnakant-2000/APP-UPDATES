@@ -53,6 +53,7 @@ const PasswordChangeSection: React.FC = () => {
     provider.providerId === 'google.com' || provider.providerId === 'apple.com'
   ) && !currentUser?.providerData.some(provider => provider.providerId === 'password');
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasEmailProvider = currentUser?.providerData.some(provider => 
     provider.providerId === 'password'
   );

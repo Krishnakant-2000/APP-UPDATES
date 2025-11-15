@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Users, 
-  Shield, 
-  Ban, 
+import {
+  Search,
+  Users,
+  Shield,
+  Ban,
   CheckCircle,
   XCircle,
   MoreVertical,
   Eye
 } from 'lucide-react';
-import { userManagementService, User } from '../services/userManagementService';
+import { User } from '../types/models';
+import { userManagementService } from '../services/userManagementService';
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -45,7 +46,13 @@ const UserManagement: React.FC = () => {
 
     try {
       setLoading(true);
-      const searchResults = await userManagementService.searchUsers(searchTerm);
+      const allUsers = await userManagementService.getAllUsers();
+      const searchLower = searchTerm.toLowerCase();
+      const searchResults = allUsers.filter(user =>
+        user.displayName?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        user.username?.toLowerCase().includes(searchLower)
+      );
       setUsers(searchResults);
     } catch (error) {
       console.error('Error searching users:', error);
@@ -56,8 +63,7 @@ const UserManagement: React.FC = () => {
 
   const filteredUsers = users.filter(user => {
     if (roleFilter !== 'all' && user.role !== roleFilter) return false;
-    if (statusFilter === 'active' && (!user.isActive || user.isSuspended)) return false;
-    if (statusFilter === 'suspended' && !user.isSuspended) return false;
+    if (statusFilter === 'active' && !user.isActive) return false;
     if (statusFilter === 'verified' && !user.isVerified) return false;
     return true;
   });
@@ -75,13 +81,13 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleUnsuspendUser = async (user: User) => {
+  const handleActivateUser = async (user: User) => {
     try {
-      await userManagementService.unsuspendUser(user.id);
+      await userManagementService.activateUser(user.id);
       await loadUsers();
       setActionMenuOpen(null);
     } catch (error) {
-      console.error('Error unsuspending user:', error);
+      console.error('Error activating user:', error);
     }
   };
 
@@ -92,16 +98,6 @@ const UserManagement: React.FC = () => {
       setActionMenuOpen(null);
     } catch (error) {
       console.error('Error verifying user:', error);
-    }
-  };
-
-  const handleUnverifyUser = async (user: User) => {
-    try {
-      await userManagementService.unverifyUser(user.id);
-      await loadUsers();
-      setActionMenuOpen(null);
-    } catch (error) {
-      console.error('Error unverifying user:', error);
     }
   };
 
@@ -137,10 +133,10 @@ const UserManagement: React.FC = () => {
                       Verified
                     </span>
                   )}
-                  {user.isSuspended && (
+                  {!user.isActive && (
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       <Ban className="w-3 h-3 mr-1" />
-                      Suspended
+                      Inactive
                     </span>
                   )}
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -179,13 +175,13 @@ const UserManagement: React.FC = () => {
               {/* Sports - Show even if empty */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Sports</label>
-                <p className="mt-1 text-sm text-gray-900">{user.sport || 'Not specified'}</p>
+                <p className="mt-1 text-sm text-gray-900">{user.sports?.join(', ') || 'Not specified'}</p>
               </div>
-              
-              {user.age && (
+
+              {user.dateOfBirth && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Age</label>
-                  <p className="mt-1 text-sm text-gray-900">{user.age}</p>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <p className="mt-1 text-sm text-gray-900">{user.dateOfBirth}</p>
                 </div>
               )}
               
@@ -200,11 +196,11 @@ const UserManagement: React.FC = () => {
             {/* Stats */}
             <div className="grid grid-cols-4 gap-4">
               <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-900">{user.followers || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{user.followersCount || 0}</p>
                 <p className="text-sm text-gray-600">Followers</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-900">{user.following || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{user.followingCount || 0}</p>
                 <p className="text-sm text-gray-600">Following</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
@@ -212,30 +208,16 @@ const UserManagement: React.FC = () => {
                 <p className="text-sm text-gray-600">Posts</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-900">{user.videosCount || 0}</p>
-                <p className="text-sm text-gray-600">Videos</p>
+                <p className="text-2xl font-bold text-gray-900">{user.storiesCount || 0}</p>
+                <p className="text-sm text-gray-600">Stories</p>
               </div>
             </div>
 
-            {/* Admin Notes */}
-            {user.adminNotes && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Admin Notes</label>
-                <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-gray-900">{user.adminNotes}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Suspension Info */}
-            {user.isSuspended && user.suspensionReason && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Suspension Reason</label>
-                <div className="mt-1 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-gray-900">{user.suspensionReason}</p>
-                </div>
-              </div>
-            )}
+            {/* Account Info */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Account Status</label>
+              <p className="mt-1 text-sm text-gray-900">{user.isActive ? 'Active' : 'Inactive'}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -355,9 +337,9 @@ const UserManagement: React.FC = () => {
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{user.displayName}</div>
                         <div className="text-sm text-gray-500">{user.email}</div>
-                        {user.sport && (
+                        {user.sports && user.sports.length > 0 && (
                           <div className="text-xs text-blue-600 mt-1">
-                            🏃‍♂️ {user.sport}
+                            🏃‍♂️ {user.sports.join(', ')}
                           </div>
                         )}
                       </div>
@@ -380,14 +362,9 @@ const UserManagement: React.FC = () => {
                           Verified
                         </span>
                       )}
-                      {user.isSuspended && (
+                      {!user.isActive && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           <Ban className="w-3 h-3 mr-1" />
-                          Suspended
-                        </span>
-                      )}
-                      {!user.isActive && !user.isSuspended && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           Inactive
                         </span>
                       )}
@@ -395,12 +372,12 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex space-x-3">
-                      <span>{user.followers || 0} followers</span>
+                      <span>{user.followersCount || 0} followers</span>
                       <span>{user.postsCount || 0} posts</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'N/A'}
+                    {user.createdAt ? new Date(typeof user.createdAt === 'string' ? user.createdAt : user.createdAt instanceof Date ? user.createdAt : user.createdAt.toDate()).toLocaleDateString() : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="relative">
@@ -424,15 +401,7 @@ const UserManagement: React.FC = () => {
                               <Eye className="w-4 h-4 inline mr-2" />
                               View Details
                             </button>
-                            {user.isVerified ? (
-                              <button
-                                onClick={() => handleUnverifyUser(user)}
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              >
-                                <XCircle className="w-4 h-4 inline mr-2" />
-                                Remove Verification
-                              </button>
-                            ) : (
+                            {!user.isVerified && (
                               <button
                                 onClick={() => handleVerifyUser(user)}
                                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -441,13 +410,13 @@ const UserManagement: React.FC = () => {
                                 Verify User
                               </button>
                             )}
-                            {user.isSuspended ? (
+                            {!user.isActive ? (
                               <button
-                                onClick={() => handleUnsuspendUser(user)}
+                                onClick={() => handleActivateUser(user)}
                                 className="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-gray-100"
                               >
                                 <CheckCircle className="w-4 h-4 inline mr-2" />
-                                Unsuspend
+                                Activate
                               </button>
                             ) : (
                               <button

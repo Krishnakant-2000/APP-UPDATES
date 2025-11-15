@@ -1,240 +1,240 @@
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy,
-  serverTimestamp,
-  deleteDoc 
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
+/**
+ * User Management Service for Admin Dashboard
+ * Handles user-related operations with real Firebase data
+ */
 
-export interface User {
-  id: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  bio?: string;
-  location?: string;
-  sport?: string;
-  role?: 'athlete' | 'coach' | 'organization';
-  gender?: 'male' | 'female' | 'other';
-  age?: number;
-  skills?: string[];
-  achievements?: Array<{
-    title: string;
-    date: string;
-    description: string;
-  }>;
-  certificates?: Array<{
-    name: string;
-    date: string;
-    description: string;
-    fileUrl?: string;
-  }>;
-  createdAt?: any;
-  lastLoginAt?: any;
-  isActive: boolean;
-  isVerified?: boolean;
-  followers?: number;
-  following?: number;
-  postsCount?: number;
-  videosCount?: number;
-  // Admin fields
-  isSuspended?: boolean;
-  suspendedAt?: any;
-  suspensionReason?: string;
-  adminNotes?: string;
+import { doc, updateDoc, getDoc, writeBatch, collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { User } from '../types/models';
+
+export interface BulkOperationResult {
+  processedCount: number;
+  failedCount: number;
+  errors: Array<{ userId: string; error: string }>;
 }
 
-class UserManagementService {
-  private collectionName = 'users';
-
-  // Get all users
-  async getAllUsers(): Promise<User[]> {
+export class UserManagementService {
+  /**
+   * Suspend a single user
+   */
+  async suspendUser(userId: string, reason?: string): Promise<void> {
     try {
-      // Don't order by createdAt since not all users have this field
-      // Get all users and sort them client-side
-      const querySnapshot = await getDocs(collection(db, this.collectionName));
-      const users: User[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const userData = doc.data();
-        users.push({ 
-          id: doc.id, 
-          ...userData,
-          isActive: userData.isActive !== false, // Default to true if not set
-        } as User);
-      });
-      
-      // Sort by displayName client-side for consistent ordering
-      return users.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw error;
-    }
-  }
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
 
-  // Search users
-  async searchUsers(searchTerm: string): Promise<User[]> {
-    try {
-      const allUsers = await this.getAllUsers();
-      
-      const filteredUsers = allUsers.filter(user => 
-        user.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.bio?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.sport?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.location?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      
-      return filteredUsers;
-    } catch (error) {
-      console.error('Error searching users:', error);
-      throw error;
-    }
-  }
+      if (!userDoc.exists()) {
+        throw new Error('User not found');
+      }
 
-  // Get users by role
-  async getUsersByRole(role: 'athlete' | 'coach' | 'organization'): Promise<User[]> {
-    try {
-      const q = query(
-        collection(db, this.collectionName),
-        where('role', '==', role)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const users: User[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const userData = doc.data();
-        users.push({ 
-          id: doc.id, 
-          ...userData,
-          isActive: userData.isActive !== false
-        } as User);
-      });
-      
-      return users.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-    } catch (error) {
-      console.error('Error fetching users by role:', error);
-      throw error;
-    }
-  }
-
-  // Get users by sport
-  async getUsersBySport(sport: string): Promise<User[]> {
-    try {
-      const q = query(
-        collection(db, this.collectionName),
-        where('sport', '==', sport)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const users: User[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const userData = doc.data();
-        users.push({ 
-          id: doc.id, 
-          ...userData,
-          isActive: userData.isActive !== false
-        } as User);
-      });
-      
-      return users.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
-    } catch (error) {
-      console.error('Error fetching users by sport:', error);
-      throw error;
-    }
-  }
-
-  // Suspend user
-  async suspendUser(userId: string, reason: string, adminNotes?: string): Promise<void> {
-    try {
-      const userRef = doc(db, this.collectionName, userId);
-      await updateDoc(userRef, {
-        isSuspended: true,
+      const updateData = {
         isActive: false,
-        suspendedAt: serverTimestamp(),
-        suspensionReason: reason,
-        adminNotes: adminNotes || ''
-      });
-      
-      console.log('User suspended successfully:', userId);
+        status: 'suspended',
+        suspendedAt: new Date().toISOString(),
+        suspensionReason: reason || 'Administrative action',
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(userRef, updateData);
+      console.log(`User ${userId} suspended successfully`);
     } catch (error) {
-      console.error('Error suspending user:', error);
-      throw error;
+      throw new Error(`Failed to suspend user: ${error}`);
     }
   }
 
-  // Unsuspend user
-  async unsuspendUser(userId: string): Promise<void> {
+  /**
+   * Bulk suspend users
+   */
+  async bulkSuspendUsers(userIds: string[], reason?: string): Promise<BulkOperationResult> {
+    const result: BulkOperationResult = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+
+    for (const userId of userIds) {
+      try {
+        await this.suspendUser(userId, reason);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Verify a single user
+   */
+  async verifyUser(userId: string, reason?: string): Promise<void> {
     try {
-      const userRef = doc(db, this.collectionName, userId);
-      await updateDoc(userRef, {
-        isSuspended: false,
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        throw new Error('User not found');
+      }
+
+      const updateData = {
+        isVerified: true,
+        verifiedAt: new Date().toISOString(),
+        verificationReason: reason || 'Administrative verification',
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(userRef, updateData);
+      console.log(`User ${userId} verified successfully`);
+    } catch (error) {
+      throw new Error(`Failed to verify user: ${error}`);
+    }
+  }
+
+  /**
+   * Bulk verify users
+   */
+  async bulkVerifyUsers(userIds: string[], reason?: string): Promise<BulkOperationResult> {
+    const result: BulkOperationResult = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+
+    for (const userId of userIds) {
+      try {
+        await this.verifyUser(userId, reason);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Activate a single user
+   */
+  async activateUser(userId: string, reason?: string): Promise<void> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        throw new Error('User not found');
+      }
+
+      const updateData = {
         isActive: true,
+        status: 'active',
+        activatedAt: new Date().toISOString(),
+        activationReason: reason || 'Administrative activation',
+        updatedAt: new Date().toISOString(),
         suspendedAt: null,
         suspensionReason: null
-      });
-      
-      console.log('User unsuspended successfully:', userId);
+      };
+
+      await updateDoc(userRef, updateData);
+      console.log(`User ${userId} activated successfully`);
     } catch (error) {
-      console.error('Error unsuspending user:', error);
-      throw error;
+      throw new Error(`Failed to activate user: ${error}`);
     }
   }
 
-  // Verify user
-  async verifyUser(userId: string): Promise<void> {
+  /**
+   * Bulk activate users
+   */
+  async bulkActivateUsers(userIds: string[], reason?: string): Promise<BulkOperationResult> {
+    const result: BulkOperationResult = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+
+    for (const userId of userIds) {
+      try {
+        await this.activateUser(userId, reason);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get user by ID
+   */
+  async getUserById(userId: string): Promise<User | null> {
     try {
-      const userRef = doc(db, this.collectionName, userId);
-      await updateDoc(userRef, {
-        isVerified: true
-      });
-      
-      console.log('User verified successfully:', userId);
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        return null;
+      }
+
+      const data = userDoc.data();
+      return {
+        uid: userDoc.id,
+        id: userDoc.id,
+        displayName: data.displayName || '',
+        email: data.email || '',
+        username: data.username || '',
+        role: data.role || 'athlete',
+        isActive: data.isActive !== false,
+        isVerified: data.isVerified || false,
+        photoURL: data.photoURL || '',
+        sports: data.sports || [],
+        postsCount: data.postsCount || 0,
+        storiesCount: data.storiesCount || 0,
+        followersCount: data.followersCount || 0,
+        followingCount: data.followingCount || 0,
+        location: data.location || '',
+        bio: data.bio || '',
+        gender: data.gender || '',
+        dateOfBirth: data.dateOfBirth || '',
+        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+      } as User;
     } catch (error) {
-      console.error('Error verifying user:', error);
-      throw error;
+      throw new Error(`Failed to fetch user: ${error}`);
     }
   }
 
-  // Unverify user
-  async unverifyUser(userId: string): Promise<void> {
+  /**
+   * Update user
+   */
+  async updateUser(userId: string, updates: Partial<User>): Promise<User> {
     try {
-      const userRef = doc(db, this.collectionName, userId);
+      const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
-        isVerified: false
+        ...updates,
+        updatedAt: new Date().toISOString()
       });
-      
-      console.log('User verification removed:', userId);
+      const updated = await this.getUserById(userId);
+      if (!updated) throw new Error('User not found after update');
+      return updated;
     } catch (error) {
-      console.error('Error removing user verification:', error);
-      throw error;
+      throw new Error(`Failed to update user: ${error}`);
     }
   }
 
-  // Update user notes
-  async updateUserNotes(userId: string, adminNotes: string): Promise<void> {
-    try {
-      const userRef = doc(db, this.collectionName, userId);
-      await updateDoc(userRef, {
-        adminNotes
-      });
-      
-      console.log('User notes updated:', userId);
-    } catch (error) {
-      console.error('Error updating user notes:', error);
-      throw error;
-    }
-  }
-
-  // Get user statistics
+  /**
+   * Get user statistics from Firebase
+   */
   async getUserStats(): Promise<{
     total: number;
     active: number;
@@ -245,33 +245,84 @@ class UserManagementService {
     organizations: number;
   }> {
     try {
-      const allUsers = await this.getAllUsers();
-      
+      const usersRef = collection(db, 'users');
+
+      const [allUsers, activeUsers, suspendedUsers, verifiedUsers, athleteUsers, coachUsers, orgUsers] = await Promise.all([
+        getDocs(usersRef),
+        getDocs(query(usersRef, where('isActive', '==', true))),
+        getDocs(query(usersRef, where('isActive', '==', false))),
+        getDocs(query(usersRef, where('isVerified', '==', true))),
+        getDocs(query(usersRef, where('role', '==', 'athlete'))),
+        getDocs(query(usersRef, where('role', '==', 'coach'))),
+        getDocs(query(usersRef, where('role', '==', 'organization')))
+      ]);
+
       return {
-        total: allUsers.length,
-        active: allUsers.filter(u => u.isActive && !u.isSuspended).length,
-        suspended: allUsers.filter(u => u.isSuspended).length,
-        verified: allUsers.filter(u => u.isVerified).length,
-        athletes: allUsers.filter(u => u.role === 'athlete').length,
-        coaches: allUsers.filter(u => u.role === 'coach').length,
-        organizations: allUsers.filter(u => u.role === 'organization').length
+        total: allUsers.size,
+        active: activeUsers.size,
+        suspended: suspendedUsers.size,
+        verified: verifiedUsers.size,
+        athletes: athleteUsers.size,
+        coaches: coachUsers.size,
+        organizations: orgUsers.size
       };
     } catch (error) {
       console.error('Error getting user stats:', error);
-      throw error;
+      return {
+        total: 0,
+        active: 0,
+        suspended: 0,
+        verified: 0,
+        athletes: 0,
+        coaches: 0,
+        organizations: 0
+      };
     }
   }
 
-  // Delete user (use with caution)
-  async deleteUser(userId: string): Promise<void> {
+  /**
+   * Get all users from Firebase
+   */
+  async getAllUsers(): Promise<User[]> {
     try {
-      await deleteDoc(doc(db, this.collectionName, userId));
-      console.log('User deleted successfully:', userId);
+      const usersRef = collection(db, 'users');
+      const querySnapshot = await getDocs(usersRef);
+
+      const users: User[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        users.push({
+          uid: doc.id,
+          id: doc.id,
+          displayName: data.displayName || '',
+          email: data.email || '',
+          username: data.username || '',
+          role: data.role || 'athlete',
+          isActive: data.isActive !== false,
+          isVerified: data.isVerified || false,
+          photoURL: data.photoURL || '',
+          sports: data.sports || [],
+          postsCount: data.postsCount || 0,
+          storiesCount: data.storiesCount || 0,
+          followersCount: data.followersCount || 0,
+          followingCount: data.followingCount || 0,
+          location: data.location || '',
+          bio: data.bio || '',
+          gender: data.gender || '',
+          dateOfBirth: data.dateOfBirth || '',
+          createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+          updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+        } as User);
+      });
+
+      return users;
     } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
+      console.error('Error getting all users from Firebase:', error);
+      return [];
     }
   }
 }
 
+// Create singleton instance
 export const userManagementService = new UserManagementService();
+export default userManagementService;

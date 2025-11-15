@@ -7,7 +7,6 @@ import {
   Activity,
   CheckCircle,
   XCircle,
-  Search,
   Filter,
   MapPin,
   Eye,
@@ -15,9 +14,17 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
-import { userManagementService, User as UserType } from '../services/userManagementService';
+import { User, Event } from '../types/models';
+import { TalentVideo } from '../types/models/search';
+import { userManagementService } from '../services/userManagementService';
 import { videoVerificationService } from '../services/videoVerificationService';
 import { eventsService } from '../services/eventsService';
+import EnhancedSearchBar from './search/EnhancedSearchBar';
+import SearchResultsDisplay from './search/SearchResultsDisplay';
+import AdvancedFiltersPanel from './search/AdvancedFiltersPanel';
+import { enhancedSearchService } from '../services/search/enhancedSearchService';
+import { BulkSelectionProvider } from '../contexts/BulkSelectionContext';
+import { SearchQuery, SearchResults, SearchFilters } from '../types/models/search';
 
 interface DashboardStats {
   users: {
@@ -43,14 +50,22 @@ interface DashboardStats {
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [users, setUsers] = useState<UserType[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   
-  // Filter states
+  // Enhanced search states
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [currentFilters, setCurrentFilters] = useState<SearchFilters>({});
+  const [useEnhancedSearch, setUseEnhancedSearch] = useState(false);
+  
+  // Legacy filter states (for backward compatibility)
+  const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'athlete' | 'coach' | 'organization'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended' | 'verified'>('all');
@@ -64,6 +79,85 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     loadDashboardData();
   }, []);
+
+  // Enhanced search handlers
+  const handleEnhancedSearch = async (query: SearchQuery) => {
+    setIsSearching(true);
+    setSearchError(null);
+    setUseEnhancedSearch(true);
+
+    try {
+      const result = await enhancedSearchService.search(query);
+      
+      if (result.success && result.data) {
+        setSearchResults(result.data);
+      } else {
+        setSearchError(result.error?.message || 'Search failed');
+        setSearchResults(null);
+      }
+    } catch (error) {
+      console.error('Enhanced search error:', error);
+      setSearchError('An unexpected error occurred during search');
+      setSearchResults(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleFiltersChange = (filters: SearchFilters) => {
+    setCurrentFilters(filters);
+    
+    // If there's an active search, re-execute with new filters
+    if (useEnhancedSearch && searchResults) {
+      const updatedQuery: SearchQuery = {
+        ...searchResults.query,
+        filters
+      };
+      handleEnhancedSearch(updatedQuery);
+    }
+  };
+
+  const handleItemClick = (item: User | TalentVideo | Event) => {
+    if ('role' in item) {
+      // It's a user
+      setSelectedUser(item as User);
+      setShowUserModal(true);
+    }
+    // Handle other item types as needed
+  };
+
+  const handleFacetClick = (facetType: string, facetValue: string) => {
+    // Update filters based on facet selection
+    const newFilters = { ...currentFilters };
+    
+    switch (facetType) {
+      case 'roles':
+        newFilters.role = newFilters.role || [];
+        if (!newFilters.role.includes(facetValue as any)) {
+          newFilters.role.push(facetValue as any);
+        }
+        break;
+      case 'statuses':
+        newFilters.status = newFilters.status || [];
+        if (!newFilters.status.includes(facetValue as any)) {
+          newFilters.status.push(facetValue as any);
+        }
+        break;
+      case 'locations':
+        newFilters.location = facetValue;
+        break;
+      // Add more facet types as needed
+    }
+    
+    handleFiltersChange(newFilters);
+  };
+
+  const handleClearSearch = () => {
+    setUseEnhancedSearch(false);
+    setSearchResults(null);
+    setSearchError(null);
+    setCurrentFilters({});
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -102,13 +196,14 @@ const Dashboard: React.FC = () => {
     // Text search
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
+      const sportsStr = user.sports?.join(' ').toLowerCase() || '';
+      const matchesSearch =
         user.displayName?.toLowerCase().includes(searchLower) ||
         user.email?.toLowerCase().includes(searchLower) ||
         user.bio?.toLowerCase().includes(searchLower) ||
         user.location?.toLowerCase().includes(searchLower) ||
-        user.sport?.toLowerCase().includes(searchLower);
-      
+        sportsStr.includes(searchLower);
+
       if (!matchesSearch) return false;
     }
 
@@ -116,37 +211,42 @@ const Dashboard: React.FC = () => {
     if (roleFilter !== 'all' && user.role !== roleFilter) return false;
 
     // Status filter
-    if (statusFilter === 'active' && (!user.isActive || user.isSuspended)) return false;
-    if (statusFilter === 'suspended' && !user.isSuspended) return false;
+    if (statusFilter === 'active' && (!user.isActive)) return false;
     if (statusFilter === 'verified' && !user.isVerified) return false;
 
     // Location filter
-    if (locationFilter.trim() && user.location && 
+    if (locationFilter.trim() && user.location &&
         !user.location.toLowerCase().includes(locationFilter.toLowerCase())) return false;
 
     // Sport filter
-    if (sportFilter.trim() && user.sport && 
-        !user.sport.toLowerCase().includes(sportFilter.toLowerCase())) return false;
+    if (sportFilter.trim() && user.sports && user.sports.length > 0) {
+      const hasSport = user.sports.some(sport =>
+        sport.toLowerCase().includes(sportFilter.toLowerCase())
+      );
+      if (!hasSport) return false;
+    } else if (sportFilter.trim()) {
+      return false;
+    }
 
     // Gender filter
     if (genderFilter !== 'all' && user.gender !== genderFilter) return false;
 
-    // Age filter
-    if (ageFilter.trim() && user.age) {
+    // Age filter - calculate from dateOfBirth if available
+    if (ageFilter.trim() && user.dateOfBirth) {
       const filterAge = parseInt(ageFilter);
       if (!isNaN(filterAge)) {
-        const userAge = parseInt(user.age.toString());
+        const birthDate = new Date(user.dateOfBirth);
+        const today = new Date();
+        let userAge = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          userAge--;
+        }
         if (ageOperator === 'exact' && userAge !== filterAge) return false;
         if (ageOperator === 'greater' && userAge <= filterAge) return false;
         if (ageOperator === 'less' && userAge >= filterAge) return false;
       }
     }
-
-    // Achievement filter
-    if (achievementFilter.trim() && user.achievements && 
-        !user.achievements.some(achievement => 
-          achievement.title.toLowerCase().includes(achievementFilter.toLowerCase()) ||
-          achievement.description.toLowerCase().includes(achievementFilter.toLowerCase()))) return false;
 
     return true;
   });
@@ -166,12 +266,12 @@ const Dashboard: React.FC = () => {
 
   const StatCard: React.FC<{
     title: string;
-    value: number;
+    value?: number;
     subtitle?: string;
     icon: React.ElementType;
     color: string;
     link: string;
-  }> = ({ title, value, subtitle, icon: Icon, color, link }) => (
+  }> = ({ title, value = 0, subtitle, icon: Icon, color, link }) => (
     <Link
       to={link}
       className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200"
@@ -179,7 +279,7 @@ const Dashboard: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900">{value.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-gray-900">{typeof value === 'number' ? value.toLocaleString() : '0'}</p>
           {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
         </div>
         <div className={`p-3 rounded-full ${color}`}>
@@ -189,7 +289,7 @@ const Dashboard: React.FC = () => {
     </Link>
   );
 
-  const UserCard: React.FC<{ user: UserType }> = ({ user }) => (
+  const UserCard: React.FC<{ user: User }> = ({ user }) => (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
@@ -223,18 +323,18 @@ const Dashboard: React.FC = () => {
           }`}>
             {user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
           </span>
-          
+
           {user.isVerified && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <CheckCircle className="w-3 h-3 mr-1" />
               Verified
             </span>
           )}
-          
-          {user.isSuspended && (
+
+          {!user.isActive && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
               <Ban className="w-3 h-3 mr-1" />
-              Suspended
+              Inactive
             </span>
           )}
         </div>
@@ -246,22 +346,22 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {user.sport && (
+        {user.sports && user.sports.length > 0 && (
           <div className="flex items-center text-sm text-gray-600">
             <Activity className="w-4 h-4 mr-2" />
-            {user.sport}
+            {user.sports.join(', ')}
           </div>
         )}
 
         <div className="flex items-center justify-between text-sm text-gray-500 mt-3">
-          <span>{user.followers || 0} followers</span>
+          <span>{user.followersCount || 0} followers</span>
           <span>{user.postsCount || 0} posts</span>
         </div>
       </div>
     </div>
   );
 
-  const UserModal: React.FC<{ user: UserType; onClose: () => void }> = ({ user, onClose }) => (
+  const UserModal: React.FC<{ user: User; onClose: () => void }> = ({ user, onClose }) => (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-90vh overflow-y-auto">
         <div className="p-6">
@@ -293,10 +393,10 @@ const Dashboard: React.FC = () => {
                       Verified
                     </span>
                   )}
-                  {user.isSuspended && (
+                  {!user.isActive && (
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       <Ban className="w-3 h-3 mr-1" />
-                      Suspended
+                      Inactive
                     </span>
                   )}
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -324,16 +424,16 @@ const Dashboard: React.FC = () => {
                   <p className="mt-1 text-sm text-gray-900">{user.location}</p>
                 </div>
               )}
-              {user.sport && (
+              {user.sports && user.sports.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Sport</label>
-                  <p className="mt-1 text-sm text-gray-900">{user.sport}</p>
+                  <label className="block text-sm font-medium text-gray-700">Sports</label>
+                  <p className="mt-1 text-sm text-gray-900">{user.sports.join(', ')}</p>
                 </div>
               )}
-              {user.age && (
+              {user.dateOfBirth && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Age</label>
-                  <p className="mt-1 text-sm text-gray-900">{user.age}</p>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <p className="mt-1 text-sm text-gray-900">{user.dateOfBirth}</p>
                 </div>
               )}
               {user.gender && (
@@ -347,11 +447,11 @@ const Dashboard: React.FC = () => {
             {/* Stats */}
             <div className="grid grid-cols-4 gap-4">
               <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-900">{user.followers || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{user.followersCount || 0}</p>
                 <p className="text-sm text-gray-600">Followers</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-900">{user.following || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{user.followingCount || 0}</p>
                 <p className="text-sm text-gray-600">Following</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
@@ -359,8 +459,8 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-600">Posts</p>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-2xl font-bold text-gray-900">{user.videosCount || 0}</p>
-                <p className="text-sm text-gray-600">Videos</p>
+                <p className="text-2xl font-bold text-gray-900">{user.storiesCount || 0}</p>
+                <p className="text-sm text-gray-600">Stories</p>
               </div>
             </div>
           </div>
@@ -423,62 +523,86 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Users Section */}
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">All Users</h2>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm text-gray-600">
-              Showing {filteredUsers.length} of {users.length} users
-            </span>
-            <Link
-              to="/users"
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-            >
-              Advanced Management →
-            </Link>
+      {/* Enhanced Search Section */}
+      <BulkSelectionProvider>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold text-gray-900">
+              {useEnhancedSearch ? 'Search Results' : 'All Users'}
+            </h2>
+            <div className="flex items-center space-x-3">
+              {useEnhancedSearch ? (
+                <>
+                  <button
+                    onClick={handleClearSearch}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
+                    ← Back to All Users
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-gray-600">
+                    Showing {filteredUsers.length} of {users.length} users
+                  </span>
+                  <Link
+                    to="/users"
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
+                    Advanced Management →
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="space-y-4">
-            {/* Main Search */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
-              <div className="flex-1 max-w-md">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search users by name, email, bio, location, or sport..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
+          {/* Enhanced Search Bar */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <EnhancedSearchBar
+              onSearch={handleEnhancedSearch}
+              placeholder="Search users, videos, events..."
+              enableAutoComplete={true}
+              enableSavedSearches={true}
+              searchTypes={['all', 'users', 'videos', 'events']}
+              initialFilters={currentFilters}
+              className="mb-4"
+            />
 
-              <div className="flex items-center space-x-3">
+            {/* Advanced Filters Toggle */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Advanced Filters</span>
+                {showAdvancedFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {!useEnhancedSearch && (
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors duration-200"
                 >
-                  <Filter className="w-4 h-4" />
-                  <span>Filters</span>
+                  <span>Legacy Filters</span>
                   {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
-                
-                <button
-                  onClick={clearAllFilters}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-                >
-                  Clear All
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Advanced Filters */}
-            {showFilters && (
+            {/* Advanced Filters Panel */}
+            {showAdvancedFilters && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <AdvancedFiltersPanel
+                  filters={currentFilters}
+                  onFiltersChange={handleFiltersChange}
+                  searchType="all"
+                />
+              </div>
+            )}
+
+            {/* Legacy Filters (for backward compatibility) */}
+            {!useEnhancedSearch && showFilters && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
@@ -576,47 +700,90 @@ const Dashboard: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                <div className="col-span-full">
+                  <button
+                    onClick={clearAllFilters}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Users Grid */}
-        {usersLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredUsers.slice(0, 12).map((user) => (
-                <UserCard key={user.id} user={user} />
-              ))}
+          {/* Search Error Display */}
+          {searchError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <XCircle className="w-5 h-5 text-red-400 mr-2" />
+                <span className="text-red-800">{searchError}</span>
+              </div>
             </div>
+          )}
 
-            {filteredUsers.length === 0 && (
-              <div className="text-center py-12">
-                <Users className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Try adjusting your search or filter criteria.
-                </p>
-              </div>
-            )}
+          {/* Search Loading */}
+          {isSearching && (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+              <span className="ml-3 text-gray-600">Searching...</span>
+            </div>
+          )}
 
-            {filteredUsers.length > 12 && (
-              <div className="text-center">
-                <Link
-                  to="/users"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-                >
-                  View All {filteredUsers.length} Users
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          {/* Enhanced Search Results */}
+          {useEnhancedSearch && searchResults && !isSearching && (
+            <SearchResultsDisplay
+              results={searchResults}
+              searchTerm={searchResults.query.term}
+              onItemClick={handleItemClick}
+              onFacetClick={handleFacetClick}
+              enableBulkSelection={true}
+              className="enhanced-search-results"
+            />
+          )}
+
+          {/* Legacy Users Grid (when not using enhanced search) */}
+          {!useEnhancedSearch && !isSearching && (
+            <>
+              {usersLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredUsers.slice(0, 12).map((user) => (
+                      <UserCard key={user.id} user={user} />
+                    ))}
+                  </div>
+
+                  {filteredUsers.length === 0 && (
+                    <div className="text-center py-12">
+                      <Users className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Try adjusting your search or filter criteria.
+                      </p>
+                    </div>
+                  )}
+
+                  {filteredUsers.length > 12 && (
+                    <div className="text-center">
+                      <Link
+                        to="/users"
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                      >
+                        View All {filteredUsers.length} Users
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </BulkSelectionProvider>
 
       {/* User Details Modal */}
       {showUserModal && selectedUser && (

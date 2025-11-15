@@ -16,6 +16,7 @@ interface CreateUserProfileData {
   bio?: string;
   location?: string;
   website?: string;
+  role?: string; // User role: 'athlete', 'organization', 'coach', 'parent'
 }
 
 /**
@@ -74,6 +75,7 @@ class UserService extends BaseService<User> {
         email: userData.email,
         displayName: userData.displayName,
         photoURL: userData.photoURL || null,
+        role: userData.role, // Save the user's role
         followersCount: 0,
         followingCount: 0,
         postsCount: 0,
@@ -95,8 +97,8 @@ class UserService extends BaseService<User> {
       // Use user ID as document ID
       const userRef = doc(db, COLLECTIONS.USERS, userData.uid);
       await setDoc(userRef, userProfile);
-      
-      console.log('✅ User profile created:', userData.uid);
+
+      console.log('✅ User profile created with role:', userData.role);
       return { id: userData.uid, ...userProfile } as User;
     } catch (error) {
       console.error('❌ Error creating user profile:', error);

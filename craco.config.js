@@ -3,6 +3,7 @@ const CompressionPlugin = require('compression-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 
 module.exports = {
+
   webpack: {
     configure: (webpackConfig, { env }) => {
       // Performance optimizations for production

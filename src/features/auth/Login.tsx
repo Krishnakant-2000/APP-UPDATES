@@ -97,6 +97,30 @@ export default function Login() {
     try {
       const userService = (await import('../../services/api/userService')).default;
 
+      // First, check if user profile exists and create if needed with the selected role
+      try {
+        const existingProfile = await userService.getUserProfile(user.uid);
+        const selectedRoleStr = localStorage.getItem('selectedUserRole') || 'athlete';
+
+        // If profile doesn't exist, create it with the selected role from localStorage
+        if (!existingProfile) {
+          await userService.createUserProfile({
+            uid: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || '',
+            photoURL: user.photoURL,
+            role: selectedRoleStr as any
+          });
+          console.log('✅ User profile created during login with role:', selectedRoleStr);
+        } else if (selectedRoleStr && !existingProfile.role) {
+          // If profile exists but doesn't have a role, update it
+          await userService.updateUserProfile(user.uid, { role: selectedRoleStr as any });
+          console.log('✅ User role updated during login:', selectedRoleStr);
+        }
+      } catch (err) {
+        console.error('Error checking or creating user profile:', err);
+      }
+
       // Check for pending athlete profile (sport/position/specializations)
       const pendingAthleteProfile = localStorage.getItem('pendingAthleteProfile');
       if (pendingAthleteProfile && user) {

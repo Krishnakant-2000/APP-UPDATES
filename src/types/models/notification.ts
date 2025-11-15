@@ -3,16 +3,19 @@ import { Timestamp } from 'firebase/firestore';
 /**
  * Notification type
  */
-export type NotificationType = 
-  | 'like' 
-  | 'comment' 
-  | 'share' 
-  | 'follow' 
-  | 'friend_request' 
-  | 'message' 
+export type NotificationType =
+  | 'like'
+  | 'comment'
+  | 'share'
+  | 'follow'
+  | 'friend_request'
+  | 'message'
   | 'mention'
   | 'event'
-  | 'system';
+  | 'system'
+  | 'org_connection_request'
+  | 'org_connection_approved'
+  | 'org_connection_rejected';
 
 /**
  * Core Notification interface
@@ -64,4 +67,7 @@ export interface NotificationPreferences {
   messages: boolean;
   mentions: boolean;
   events: boolean;
+  orgConnectionRequests?: boolean;
+  orgConnectionApproved?: boolean;
+  orgConnectionRejected?: boolean;
 }

@@ -11,3 +11,5 @@ export * from './group';
 export * from './notification';
 export * from './sharing';
 export * from './moment';
+export * from './search';
+export * from './organizationConnection';

@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import UserManagement from './components/UserManagement';
 import EventManagement from './components/EventManagement';
 import VideoVerification from './components/VideoVerification';
+import ConnectionRequests from './components/ConnectionRequests';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import './App.css';
 
@@ -42,6 +43,13 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <VideoVerification />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/connections" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ConnectionRequests />
                 </Layout>
               </ProtectedRoute>
             } />

@@ -4,6 +4,17 @@ import { Edit3 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import NavigationBar from '../../../components/layout/NavigationBar';
 import FooterNav from '../../../components/layout/FooterNav';
+import { db } from '../../../lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp
+} from 'firebase/firestore';
 import RoleSelector from '../components/RoleSelector';
 import RoleSpecificSections from '../components/RoleSpecificSections';
 import ProfilePictureManager from '../components/ProfilePictureManager';
@@ -25,6 +36,8 @@ import { TalentVideo } from '../types/TalentVideoTypes';
 import PhysicalAttributesSection from '../components/PhysicalAttributesSection';
 import TrackBestSection from '../components/TrackBestSection';
 import AchievementsCertificatesSection from '../components/AchievementsCertificatesSection';
+import MessageButton from '../components/MessageButton';
+import { organizationConnectionService } from '../../../services/api/organizationConnectionService';
 import '../styles/Profile.css';
 
 // Lazy load heavy components for better performance
@@ -1308,25 +1321,155 @@ const Profile: React.FC = React.memo(() => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
 
+  // Messaging and connection states
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'pending' | 'none'>('none');
+  const [targetUserRole, setTargetUserRole] = useState<string>('athlete');
+  const [targetUserDisplayName, setTargetUserDisplayName] = useState<string>('User');
+
   const handleFollowToggle = useCallback(async () => {
     if (!userId || isOwner || isGuest() || !firebaseUser) return;
 
     setFollowLoading(true);
     try {
-      // In a real app, this would send a friend request or follow the user
-      // For now, we'll just toggle the state
-      setIsFollowing(!isFollowing);
-      announceToScreenReader(isFollowing ? 'Unfollowed user' : 'Following user');
+      if (isFollowing) {
+        // Unfollow: remove from follows collection
+        const q = query(
+          collection(db, 'follows'),
+          where('followerId', '==', firebaseUser.uid),
+          where('followingId', '==', userId)
+        );
 
-      // TODO: Implement actual friend request/follow logic with Firebase
-      console.log(isFollowing ? 'Unfollowing user:' : 'Following user:', userId);
+        const snapshot = await getDocs(q);
+        snapshot.forEach(async (docSnapshot) => {
+          await deleteDoc(doc(db, 'follows', docSnapshot.id));
+        });
+
+        setIsFollowing(false);
+        announceToScreenReader('Unfollowed user');
+        console.log('✅ Unfollowed user:', userId);
+      } else {
+        // Follow: add to follows collection
+        await addDoc(collection(db, 'follows'), {
+          followerId: firebaseUser.uid,
+          followingId: userId,
+          followerName: firebaseUser.displayName || 'Anonymous User',
+          followingName: personalDetails.name || 'Unknown User',
+          timestamp: serverTimestamp()
+        });
+
+        setIsFollowing(true);
+        announceToScreenReader('Following user');
+        console.log('✅ Now following user:', userId);
+      }
     } catch (error) {
       console.error('Error toggling follow status:', error);
       announceToScreenReader('Failed to update follow status');
     } finally {
       setFollowLoading(false);
     }
-  }, [userId, isOwner, isGuest, firebaseUser, isFollowing, announceToScreenReader]);
+  }, [userId, isOwner, isGuest, firebaseUser, isFollowing, announceToScreenReader, personalDetails.name]);
+
+  // Check if current user is already following this user
+  useEffect(() => {
+    if (isOwner || !userId || !firebaseUser) {
+      setIsFollowing(false);
+      return;
+    }
+
+    const checkFollowingStatus = async () => {
+      try {
+        const q = query(
+          collection(db, 'follows'),
+          where('followerId', '==', firebaseUser.uid),
+          where('followingId', '==', userId)
+        );
+
+        const snapshot = await getDocs(q);
+        setIsFollowing(!snapshot.empty);
+        console.log(`📊 Following status for ${userId}: ${!snapshot.empty}`);
+      } catch (error) {
+        console.error('Error checking following status:', error);
+        setIsFollowing(false);
+      }
+    };
+
+    checkFollowingStatus();
+  }, [userId, firebaseUser, isOwner]);
+
+  // Check connection status with viewed user (for messaging)
+  useEffect(() => {
+    if (isOwner || !userId || !firebaseUser) {
+      setConnectionStatus('none');
+      return;
+    }
+
+    const checkConnectionStatus = async () => {
+      try {
+        // Get the viewed user's profile to fetch their role
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../../lib/firebase');
+
+        const viewedUserRef = doc(db, 'users', userId);
+        const viewedUserSnap = await getDoc(viewedUserRef);
+
+        if (viewedUserSnap.exists()) {
+          const userData = viewedUserSnap.data();
+          setTargetUserRole(userData.role || 'athlete');
+          setTargetUserDisplayName(userData.displayName || 'User');
+
+          // Check for pending organization connection requests
+          const orgConnReq = await organizationConnectionService.checkRequestExists(
+            firebaseUser.uid,
+            userId
+          );
+
+          if (orgConnReq && orgConnReq.status === 'pending') {
+            setConnectionStatus('pending');
+            return;
+          }
+
+          // Check if approved connection exists
+          const approvedConns = await organizationConnectionService.getApprovedConnectionsForAthlete(
+            userId
+          );
+
+          if (approvedConns.some(conn => conn.organizationId === firebaseUser.uid)) {
+            setConnectionStatus('connected');
+            return;
+          }
+
+          // Also check the reverse: athlete connecting to organization
+          const orgConns = await organizationConnectionService.getApprovedConnectionsForOrganization(
+            userId
+          );
+
+          if (orgConns.some(conn => conn.athleteId === firebaseUser.uid)) {
+            setConnectionStatus('connected');
+            return;
+          }
+
+          setConnectionStatus('none');
+        }
+      } catch (error) {
+        console.error('Error checking connection status:', error);
+        setConnectionStatus('none');
+      }
+    };
+
+    checkConnectionStatus();
+  }, [userId, firebaseUser, isOwner]);
+
+  // Handler to open chat
+  const handleOpenChat = useCallback(() => {
+    if (userId) {
+      navigate(`/messages/${userId}`);
+    }
+  }, [userId, navigate]);
+
+  // Handler for connection request sent
+  const handleConnectionRequestSent = useCallback(() => {
+    setConnectionStatus('pending');
+  }, []);
 
   // Log render performance after component updates - Disabled
   // useEffect(() => {
@@ -1472,15 +1615,25 @@ const Profile: React.FC = React.memo(() => {
             </div>
 
             {!isOwner && (
-              <button
-                className={`follow-button ${isFollowing ? 'following' : 'not-following'}`}
-                onClick={handleFollowToggle}
-                disabled={followLoading}
-                type="button"
-                aria-label={isFollowing ? 'Unfollow this user' : 'Follow this user'}
-              >
-                {followLoading ? 'Loading...' : (isFollowing ? 'Following' : 'Follow')}
-              </button>
+              <div className="profile-action-buttons">
+                <button
+                  className={`follow-button ${isFollowing ? 'following' : 'not-following'}`}
+                  onClick={handleFollowToggle}
+                  disabled={followLoading}
+                  type="button"
+                  aria-label={isFollowing ? 'Unfollow this user' : 'Follow this user'}
+                >
+                  {followLoading ? 'Loading...' : (isFollowing ? 'Following' : 'Follow')}
+                </button>
+                <MessageButton
+                  targetUserId={userId || ''}
+                  targetUserName={targetUserDisplayName}
+                  targetUserRole={targetUserRole}
+                  connectionStatus={connectionStatus}
+                  onConnectionRequest={handleConnectionRequestSent}
+                  onOpenChat={handleOpenChat}
+                />
+              </div>
             )}
           </div>
         </header>

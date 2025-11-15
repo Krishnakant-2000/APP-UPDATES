@@ -36,10 +36,13 @@ const EventManagement: React.FC = () => {
   const loadEvents = async () => {
     try {
       setLoading(true);
+      console.log('🎬 ADMIN: Loading events from Firebase...');
       const allEvents = await eventsService.getAllEvents();
+      console.log('📊 ADMIN: Events loaded:', allEvents);
+      console.log('📈 ADMIN: Total events:', allEvents.length);
       setEvents(allEvents);
     } catch (error) {
-      console.error('Error loading events:', error);
+      console.error('❌ ADMIN: Error loading events:', error);
     } finally {
       setLoading(false);
     }

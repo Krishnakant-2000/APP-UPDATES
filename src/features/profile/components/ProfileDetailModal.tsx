@@ -2,6 +2,17 @@ import { memo, useState, useEffect, useCallback } from 'react';
 import { X, MapPin, Calendar, Award, Users, Image, Video, Heart, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import LazyImage from '../../../components/common/ui/LazyImage';
+import { db } from '../../../lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp
+} from 'firebase/firestore';
 import '../styles/ProfileDetailModal.css';
 
 interface ProfileDetailModalProps {
@@ -123,10 +134,43 @@ const ProfileDetailModal = memo(({ userId, onClose }: ProfileDetailModalProps) =
     }));
   }, []);
 
-  const followUser = useCallback(async (_userUid: string, following: boolean): Promise<{ success: boolean; following: boolean }> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { success: true, following };
-  }, []);
+  const followUser = useCallback(async (userUid: string, following: boolean): Promise<{ success: boolean; following: boolean }> => {
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      if (following) {
+        // Follow: add to follows collection
+        await addDoc(collection(db, 'follows'), {
+          followerId: currentUser.uid,
+          followingId: userUid,
+          followerName: currentUser.displayName || 'Anonymous User',
+          followingName: profile?.displayName || 'Unknown User',
+          timestamp: serverTimestamp()
+        });
+        console.log('✅ Now following:', userUid);
+      } else {
+        // Unfollow: remove from follows collection
+        const q = query(
+          collection(db, 'follows'),
+          where('followerId', '==', currentUser.uid),
+          where('followingId', '==', userUid)
+        );
+
+        const snapshot = await getDocs(q);
+        snapshot.forEach(async (docSnapshot) => {
+          await deleteDoc(doc(db, 'follows', docSnapshot.id));
+        });
+        console.log('✅ Unfollowed:', userUid);
+      }
+
+      return { success: true, following };
+    } catch (error) {
+      console.error('Error updating follow status:', error);
+      throw error;
+    }
+  }, [currentUser, profile?.displayName]);
 
   // Load profile data
   useEffect(() => {

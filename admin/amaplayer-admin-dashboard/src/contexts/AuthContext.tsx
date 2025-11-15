@@ -65,17 +65,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
+      // Check if using mock authentication for development
+      const useMockAuth = process.env.REACT_APP_USE_MOCK_AUTH === 'true';
+      const mockAdminEmail = process.env.REACT_APP_ADMIN_EMAIL;
+      const mockAdminPassword = process.env.REACT_APP_ADMIN_PASSWORD;
+
+      console.log('Login attempt:', {
+        email,
+        useMockAuth,
+        mockAdminEmail,
+        mockAdminPassword,
+        envVars: process.env
+      });
+
+      if (useMockAuth && mockAdminEmail && mockAdminPassword) {
+        // Mock authentication mode
+        console.log('Checking mock auth:', { email, mockAdminEmail, password, mockAdminPassword });
+        if (email === mockAdminEmail && password === mockAdminPassword) {
+          // Create a mock user object
+          const mockUser = {
+            email: mockAdminEmail,
+            uid: 'mock-admin-user',
+            displayName: 'Admin User',
+          } as any;
+
+          setCurrentUser(mockUser);
+          setIsAdmin(true);
+          console.log('Admin logged in successfully (mock mode)');
+          return;
+        } else {
+          throw new Error('Invalid email or password');
+        }
+      }
+
+      // Real Firebase authentication
+      if (!auth) {
+        throw new Error('Firebase Authentication not available. Please configure Firebase credentials.');
+      }
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Check if user is admin
       if (adminEmail && userCredential.user.email !== adminEmail) {
         await signOut(auth);
         throw new Error('Access denied. Admin privileges required.');
       }
-      
+
       console.log('Admin logged in successfully');
     } catch (error) {
-      const authError = error as AuthError;
+      const authError = error as any;
       console.error('Login error:', authError.message);
       throw new Error(authError.message);
     }
@@ -83,6 +120,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (): Promise<void> => {
     try {
+      // Check if using mock authentication
+      const useMockAuth = process.env.REACT_APP_USE_MOCK_AUTH === 'true';
+
+      if (useMockAuth) {
+        // Clear mock user
+        setCurrentUser(null);
+        setIsAdmin(false);
+        console.log('Admin logged out successfully (mock mode)');
+        return;
+      }
+
+      if (!auth) {
+        console.warn('Firebase Authentication not available');
+        return;
+      }
       await signOut(auth);
       console.log('Admin logged out successfully');
     } catch (error) {
@@ -93,6 +145,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    // If auth is not available, set loading to false and allow access for development
+    if (!auth) {
+      console.warn('Firebase Auth not initialized - running in development mode');
+      setLoading(false);
+      // For development, allow access without authentication
+      setIsAdmin(true);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       await checkAdminStatus(user);

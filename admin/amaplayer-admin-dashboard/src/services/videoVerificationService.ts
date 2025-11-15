@@ -1,215 +1,195 @@
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
+/**
+ * Video Verification Service for Admin Dashboard
+ * Handles video verification operations with real Firebase data
+ */
 
-export interface TalentVideo {
-  id: string;
-  userId: string;
-  userDisplayName?: string;
-  userEmail?: string;
-  userPhotoURL?: string;
-  videoUrl: string;
-  fileName?: string;
-  title?: string;
-  description?: string;
-  category?: string;
-  uploadedAt: any;
-  views?: number;
-  likes?: string[];
-  thumbnail?: string;
-  fileSize?: number;
-  duration?: number;
-  flags?: {
-    reason: string;
-    flaggedBy: string;
-    flaggedAt: any;
-  }[];
-  // Verification fields
-  isVerified: boolean;
-  verificationStatus: 'pending' | 'approved' | 'rejected';
-  reviewedAt?: any;
-  verifiedAt?: any;
-  verifiedBy?: string;
-  reviewedBy?: string;
-  rejectionReason?: string;
-  adminNotes?: string;
+import { doc, updateDoc, getDoc, writeBatch, collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { TalentVideo } from '../types/models/search';
+
+export interface BulkVideoOperationResult {
+  processedCount: number;
+  failedCount: number;
+  errors: Array<{ videoId: string; error: string }>;
 }
 
-class VideoVerificationService {
-  private collectionName = 'talentVideos';
+/**
+ * Video Verification Service
+ */
+export class VideoVerificationService {
+  private readonly COLLECTION_NAME = 'videos';
 
-  // Get all videos for verification
-  async getAllVideos(): Promise<TalentVideo[]> {
+  async approveVideo(videoId: string, reason?: string): Promise<void> {
     try {
-      console.log('🎬 Admin: Fetching all videos from collection:', this.collectionName);
-      
-      // Simple query without ordering to avoid index requirements
-      const querySnapshot = await getDocs(collection(db, this.collectionName));
-      const videos: TalentVideo[] = [];
-      
-      console.log(`📊 Admin: Found ${querySnapshot.size} videos in database`);
-      
-      querySnapshot.forEach((doc) => {
-        const videoData = doc.data();
-        const processedVideo = { 
-          id: doc.id, 
-          ...videoData,
-          // Ensure verification fields exist
-          isVerified: videoData.isVerified || false,
-          verificationStatus: videoData.verificationStatus || 'pending'
-        } as TalentVideo;
-        
-        console.log('📝 Admin: Processing video:', {
-          id: processedVideo.id,
-          fileName: processedVideo.fileName,
-          userDisplayName: processedVideo.userDisplayName,
-          verificationStatus: processedVideo.verificationStatus,
-          isVerified: processedVideo.isVerified,
-          uploadedAt: processedVideo.uploadedAt
-        });
-        
-        videos.push(processedVideo);
-      });
-      
-      // Sort by uploadedAt client-side (newest first)
-      const sortedVideos = videos.sort((a, b) => {
-        const aTime = a.uploadedAt?.seconds || 0;
-        const bTime = b.uploadedAt?.seconds || 0;
-        return bTime - aTime;
-      });
-      
-      console.log(`✅ Admin: Returning ${sortedVideos.length} processed videos`);
-      return sortedVideos;
-    } catch (error) {
-      console.error('❌ Admin: Error fetching videos:', error);
-      throw error;
-    }
-  }
+      const videoRef = doc(db, this.COLLECTION_NAME, videoId);
+      const videoDoc = await getDoc(videoRef);
 
-  // Get pending videos for verification
-  async getPendingVideos(): Promise<TalentVideo[]> {
-    try {
-      // Get all videos and filter client-side to avoid index requirements
-      const allVideos = await this.getAllVideos();
-      
-      // Filter for pending videos
-      const pendingVideos = allVideos.filter(video => 
-        video.verificationStatus === 'pending' || 
-        video.verificationStatus === undefined ||
-        video.verificationStatus === null
-      );
-      
-      return pendingVideos;
-    } catch (error) {
-      console.error('Error fetching pending videos:', error);
-      throw error;
-    }
-  }
+      if (!videoDoc.exists()) {
+        throw new Error('Video not found');
+      }
 
-  // Approve video
-  async approveVideo(videoId: string, adminEmail?: string, adminNotes?: string): Promise<void> {
-    try {
-      const videoRef = doc(db, this.collectionName, videoId);
-      await updateDoc(videoRef, {
-        isVerified: true,
+      const updateData = {
         verificationStatus: 'approved',
-        verifiedAt: serverTimestamp(),
-        verifiedBy: adminEmail || 'admin',
-        adminNotes: adminNotes || '',
-        rejectionReason: null
-      });
-      
-      console.log('Video approved successfully:', videoId);
+        approvedAt: new Date().toISOString(),
+        approvalReason: reason || 'Administrative approval',
+        isActive: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(videoRef, updateData);
+      console.log(`Video ${videoId} approved successfully`);
     } catch (error) {
-      console.error('Error approving video:', error);
-      throw error;
+      throw new Error(`Failed to approve video: ${error}`);
     }
   }
 
-  // Flag video
-  async flagVideo(videoId: string, reason: string, adminEmail?: string): Promise<void> {
-    try {
-      const videoRef = doc(db, this.collectionName, videoId);
-      await updateDoc(videoRef, {
-        [`flags.${Date.now()}`]: {
-          reason,
-          flaggedBy: adminEmail || 'admin',
-          flaggedAt: serverTimestamp()
-        }
-      });
-      
-      console.log('Video flagged:', videoId);
-    } catch (error) {
-      console.error('Error flagging video:', error);
-      throw error;
+  async bulkApproveVideos(videoIds: string[], reason?: string): Promise<BulkVideoOperationResult> {
+    const result: BulkVideoOperationResult = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+
+    for (const videoId of videoIds) {
+      try {
+        await this.approveVideo(videoId, reason);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          videoId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     }
+
+    return result;
   }
 
-  // Reject video
-  async rejectVideo(videoId: string, rejectionReason?: string, adminEmail?: string, adminNotes?: string): Promise<void> {
+  async rejectVideo(videoId: string, reason?: string): Promise<void> {
     try {
-      const videoRef = doc(db, this.collectionName, videoId);
-      await updateDoc(videoRef, {
-        isVerified: false,
+      const videoRef = doc(db, this.COLLECTION_NAME, videoId);
+      const videoDoc = await getDoc(videoRef);
+
+      if (!videoDoc.exists()) {
+        throw new Error('Video not found');
+      }
+
+      const updateData = {
         verificationStatus: 'rejected',
-        verifiedAt: serverTimestamp(),
-        verifiedBy: adminEmail || 'admin',
-        rejectionReason: rejectionReason || 'No reason provided',
-        adminNotes: adminNotes || ''
-      });
-      
-      console.log('Video rejected:', videoId);
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason || 'Administrative rejection',
+        isActive: false,
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(videoRef, updateData);
+      console.log(`Video ${videoId} rejected successfully`);
     } catch (error) {
-      console.error('Error rejecting video:', error);
-      throw error;
+      throw new Error(`Failed to reject video: ${error}`);
     }
   }
 
-  // Reset video to pending status
-  async resetVideoStatus(videoId: string): Promise<void> {
+  async bulkRejectVideos(videoIds: string[], reason?: string): Promise<BulkVideoOperationResult> {
+    const result: BulkVideoOperationResult = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+
+    for (const videoId of videoIds) {
+      try {
+        await this.rejectVideo(videoId, reason);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          videoId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async flagVideo(videoId: string, reason?: string): Promise<void> {
     try {
-      const videoRef = doc(db, this.collectionName, videoId);
-      await updateDoc(videoRef, {
-        isVerified: false,
+      const videoRef = doc(db, this.COLLECTION_NAME, videoId);
+      const videoDoc = await getDoc(videoRef);
+
+      if (!videoDoc.exists()) {
+        throw new Error('Video not found');
+      }
+
+      const updateData = {
+        isFlagged: true,
+        flaggedAt: new Date().toISOString(),
+        flagReason: reason || 'Administrative flag',
         verificationStatus: 'pending',
-        verifiedAt: null,
-        verifiedBy: null,
-        rejectionReason: null,
-        adminNotes: null
-      });
-      
-      console.log('Video status reset to pending:', videoId);
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(videoRef, updateData);
+      console.log(`Video ${videoId} flagged successfully`);
     } catch (error) {
-      console.error('Error resetting video status:', error);
-      throw error;
+      throw new Error(`Failed to flag video: ${error}`);
     }
   }
 
-  // Get videos by user
-  async getVideosByUser(userId: string): Promise<TalentVideo[]> {
+  async bulkFlagVideos(videoIds: string[], reason?: string): Promise<BulkVideoOperationResult> {
+    const result: BulkVideoOperationResult = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+
+    for (const videoId of videoIds) {
+      try {
+        await this.flagVideo(videoId, reason);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          videoId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async getVideoById(videoId: string): Promise<TalentVideo | null> {
     try {
-      // Get all videos and filter client-side to avoid index requirements
-      const allVideos = await this.getAllVideos();
-      
-      // Filter for specific user
-      const userVideos = allVideos.filter(video => video.userId === userId);
-      
-      return userVideos;
+      const videoRef = doc(db, this.COLLECTION_NAME, videoId);
+      const videoDoc = await getDoc(videoRef);
+
+      if (!videoDoc.exists()) {
+        return null;
+      }
+
+      return { id: videoDoc.id, ...videoDoc.data() } as TalentVideo;
     } catch (error) {
-      console.error('Error fetching user videos:', error);
-      throw error;
+      throw new Error(`Failed to fetch video: ${error}`);
     }
   }
 
-  // Get verification statistics
+  async updateVideo(videoId: string, updates: Partial<TalentVideo>): Promise<TalentVideo> {
+    try {
+      const videoRef = doc(db, this.COLLECTION_NAME, videoId);
+      await updateDoc(videoRef, {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      });
+      const updated = await this.getVideoById(videoId);
+      if (!updated) throw new Error('Video not found after update');
+      return updated;
+    } catch (error) {
+      throw new Error(`Failed to update video: ${error}`);
+    }
+  }
+
   async getVerificationStats(): Promise<{
     total: number;
     pending: number;
@@ -217,19 +197,70 @@ class VideoVerificationService {
     rejected: number;
   }> {
     try {
-      const allVideos = await this.getAllVideos();
-      
+      const videosRef = collection(db, this.COLLECTION_NAME);
+
+      const [allVideos, pendingVideos, approvedVideos, rejectedVideos] = await Promise.all([
+        getDocs(videosRef),
+        getDocs(query(videosRef, where('verificationStatus', '==', 'pending'))),
+        getDocs(query(videosRef, where('verificationStatus', '==', 'approved'))),
+        getDocs(query(videosRef, where('verificationStatus', '==', 'rejected')))
+      ]);
+
       return {
-        total: allVideos.length,
-        pending: allVideos.filter(v => v.verificationStatus === 'pending').length,
-        approved: allVideos.filter(v => v.verificationStatus === 'approved').length,
-        rejected: allVideos.filter(v => v.verificationStatus === 'rejected').length
+        total: allVideos.size,
+        pending: pendingVideos.size,
+        approved: approvedVideos.size,
+        rejected: rejectedVideos.size
       };
     } catch (error) {
-      console.error('Error getting verification stats:', error);
-      throw error;
+      console.error('Error getting video verification stats:', error);
+      return {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0
+      };
+    }
+  }
+
+  /**
+   * Get all videos from Firebase for verification
+   */
+  async getAllVideos(): Promise<TalentVideo[]> {
+    try {
+      const videosRef = collection(db, this.COLLECTION_NAME);
+      const querySnapshot = await getDocs(videosRef);
+
+      const videos: TalentVideo[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        videos.push({
+          id: doc.id,
+          title: data.title || 'Untitled Video',
+          description: data.description || '',
+          videoUrl: data.videoUrl || '',
+          thumbnail: data.thumbnail || '',
+          category: data.category || '',
+          userName: data.userName || 'Unknown User',
+          userId: data.userId || '',
+          userEmail: data.userEmail || '',
+          verificationStatus: data.verificationStatus || 'pending',
+          isFlagged: data.isFlagged || false,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          isVerified: data.isVerified || false,
+          isActive: data.isActive !== false
+        } as TalentVideo);
+      });
+
+      return videos;
+    } catch (error) {
+      console.error('Error getting all videos from Firebase:', error);
+      return [];
     }
   }
 }
 
+// Create singleton instance
 export const videoVerificationService = new VideoVerificationService();
+export default videoVerificationService;

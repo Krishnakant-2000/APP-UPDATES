@@ -12,9 +12,19 @@ import {
   AlertTriangle,
   ThumbsUp,
   ThumbsDown,
-  MoreVertical
+  MoreVertical,
+  Filter,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
-import { videoVerificationService, TalentVideo } from '../services/videoVerificationService';
+import { videoVerificationService } from '../services/videoVerificationService';
+import { TalentVideo, SearchQuery, SearchResults, SearchFilters } from '../types/models/search';
+import EnhancedSearchBar from './search/EnhancedSearchBar';
+import SearchResultsDisplay from './search/SearchResultsDisplay';
+import AdvancedFiltersPanel from './search/AdvancedFiltersPanel';
+import BulkOperationsPanel from './search/BulkOperationsPanel';
+import { enhancedSearchService } from '../services/search/enhancedSearchService';
+import { BulkSelectionProvider } from '../contexts/BulkSelectionContext';
 
 const VideoVerification: React.FC = () => {
   const [videos, setVideos] = useState<TalentVideo[]>([]);
@@ -26,20 +36,116 @@ const VideoVerification: React.FC = () => {
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
 
+  // Enhanced search states
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [currentFilters, setCurrentFilters] = useState<SearchFilters>({});
+  const [useEnhancedSearch, setUseEnhancedSearch] = useState(false);
+  const [showBulkOperations, setShowBulkOperations] = useState(false);
+
   useEffect(() => {
     loadVideos();
   }, []);
+
+  // Enhanced search handlers
+  const handleEnhancedSearch = async (query: SearchQuery) => {
+    setIsSearching(true);
+    setSearchError(null);
+    setUseEnhancedSearch(true);
+
+    try {
+      // Force search type to videos for this component
+      const videoQuery = { ...query, searchType: 'videos' as const };
+      const result = await enhancedSearchService.search(videoQuery);
+      
+      if (result.success && result.data) {
+        setSearchResults(result.data);
+      } else {
+        setSearchError(result.error?.message || 'Search failed');
+        setSearchResults(null);
+      }
+    } catch (error) {
+      console.error('Enhanced search error:', error);
+      setSearchError('An unexpected error occurred during search');
+      setSearchResults(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleFiltersChange = (filters: SearchFilters) => {
+    setCurrentFilters(filters);
+    
+    // If there's an active search, re-execute with new filters
+    if (useEnhancedSearch && searchResults) {
+      const updatedQuery: SearchQuery = {
+        ...searchResults.query,
+        filters
+      };
+      handleEnhancedSearch(updatedQuery);
+    }
+  };
+
+  const handleItemClick = (item: any) => {
+    // Convert search result to TalentVideo for modal
+    const video: TalentVideo = {
+      ...item,
+      uploadedAt: item.createdAt as any,
+      userName: item.userName,
+      userEmail: item.userId,
+      isVerified: item.isVerified || false // Add missing property
+    };
+    setSelectedVideo(video);
+    setShowVideoModal(true);
+  };
+
+  const handleFacetClick = (facetType: string, facetValue: string) => {
+    const newFilters = { ...currentFilters };
+    
+    switch (facetType) {
+      case 'verificationStatuses':
+        newFilters.verificationStatus = newFilters.verificationStatus || [];
+        if (!newFilters.verificationStatus.includes(facetValue as any)) {
+          newFilters.verificationStatus.push(facetValue as any);
+        }
+        break;
+      case 'categories':
+        newFilters.category = newFilters.category || [];
+        if (!newFilters.category.includes(facetValue)) {
+          newFilters.category.push(facetValue);
+        }
+        break;
+    }
+    
+    handleFiltersChange(newFilters);
+  };
+
+  const handleClearSearch = () => {
+    setUseEnhancedSearch(false);
+    setSearchResults(null);
+    setSearchError(null);
+    setCurrentFilters({});
+  };
+
+  const handleBulkOperationsClick = () => {
+    setShowBulkOperations(true);
+  };
 
   const loadVideos = async () => {
     console.log('🎬 ADMIN: LoadVideos function called');
     try {
       setLoading(true);
-      console.log('🔄 ADMIN: Calling getAllVideos...');
+      console.log('🔄 ADMIN: Calling getAllVideos from Firebase...');
+      // Fetch real videos from Firebase
       const allVideos = await videoVerificationService.getAllVideos();
-      console.log('📊 ADMIN: Received videos:', allVideos.length, allVideos);
+      console.log('📊 ADMIN: Received videos:', allVideos);
+      console.log('📈 ADMIN: Total videos loaded:', allVideos.length);
       setVideos(allVideos);
     } catch (error) {
       console.error('❌ ADMIN: Error loading videos:', error);
+      setVideos([]);
     } finally {
       setLoading(false);
     }
@@ -52,7 +158,7 @@ const VideoVerification: React.FC = () => {
       const searchLower = searchTerm.toLowerCase();
       return (
         video.title?.toLowerCase().includes(searchLower) ||
-        video.userDisplayName?.toLowerCase().includes(searchLower) ||
+        video.userName?.toLowerCase().includes(searchLower) ||
         video.description?.toLowerCase().includes(searchLower) ||
         video.category?.toLowerCase().includes(searchLower)
       );
@@ -203,8 +309,7 @@ const VideoVerification: React.FC = () => {
                     <User className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{video.userDisplayName || 'Unknown User'}</p>
-                    <p className="text-sm text-gray-600">{video.userEmail}</p>
+                    <p className="font-medium text-gray-900">{video.userName || 'Unknown User'}</p>
                     <p className="text-sm text-gray-500">User ID: {video.userId}</p>
                   </div>
                 </div>
@@ -218,67 +323,20 @@ const VideoVerification: React.FC = () => {
                 </div>
               )}
 
-              {/* Video Stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <p className="text-lg font-bold text-gray-900">{video.views || 0}</p>
-                  <p className="text-sm text-gray-600">Views</p>
-                </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <p className="text-lg font-bold text-gray-900">{video.likes || 0}</p>
-                  <p className="text-sm text-gray-600">Likes</p>
-                </div>
+              {/* Video Status */}
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>Status:</strong> {video.verificationStatus.charAt(0).toUpperCase() + video.verificationStatus.slice(1)}
+                </p>
               </div>
 
-              {/* Technical Details */}
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">File Size:</span>
-                  <span className="text-gray-900">
-                    {video.fileSize ? `${(video.fileSize / (1024 * 1024)).toFixed(1)} MB` : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Duration:</span>
-                  <span className="text-gray-900">{video.duration ? `${video.duration}s` : 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Upload Date:</span>
-                  <span className="text-gray-900">
-                    {video.uploadedAt ? new Date(video.uploadedAt.toDate()).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
+              {/* Upload Date */}
+              <div className="text-sm">
+                <span className="text-gray-600">Upload Date:</span>
+                <span className="text-gray-900 ml-2">
+                  {video.createdAt ? new Date(typeof video.createdAt === 'string' ? video.createdAt : video.createdAt instanceof Date ? video.createdAt : video.createdAt.toDate()).toLocaleDateString() : 'N/A'}
+                </span>
               </div>
-
-              {/* Review History */}
-              {video.reviewedAt && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Last Review:</strong> {new Date(video.reviewedAt.toDate()).toLocaleString()}
-                  </p>
-                  {video.reviewedBy && (
-                    <p className="text-sm text-yellow-700">by {video.reviewedBy}</p>
-                  )}
-                  {video.rejectionReason && (
-                    <p className="text-sm text-yellow-700 mt-1">
-                      <strong>Reason:</strong> {video.rejectionReason}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Flags */}
-              {video.flags && video.flags.length > 0 && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-800 font-medium mb-2">Flags:</p>
-                  {video.flags.map((flag, index) => (
-                    <div key={index} className="text-sm text-red-700">
-                      <p><strong>{flag.reason}</strong></p>
-                      <p className="text-xs">by {flag.flaggedBy} on {new Date(flag.flaggedAt.toDate()).toLocaleDateString()}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -403,40 +461,127 @@ const VideoVerification: React.FC = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search videos by title, user, or description..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+      {/* Enhanced Search and Filters */}
+      <BulkSelectionProvider>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          {/* Enhanced Search Bar */}
+          <EnhancedSearchBar
+            onSearch={handleEnhancedSearch}
+            placeholder="Search videos by title, user, description..."
+            enableAutoComplete={true}
+            enableSavedSearches={true}
+            searchTypes={['videos']}
+            initialFilters={currentFilters}
+            className="mb-4"
+          />
+
+          {/* Search Controls */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Advanced Filters</span>
+                {showAdvancedFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {useEnhancedSearch && (
+                <button
+                  onClick={handleClearSearch}
+                  className="px-4 py-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  ← Back to All Videos
+                </button>
+              )}
+            </div>
+
+            {/* Legacy Filter (for backward compatibility) */}
+            {!useEnhancedSearch && (
+              <div className="flex space-x-4">
+                <div className="flex-1 max-w-md">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search videos by title, user, or description..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Advanced Filters Panel */}
+          {showAdvancedFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <AdvancedFiltersPanel
+                filters={currentFilters}
+                onFiltersChange={handleFiltersChange}
+                searchType="videos"
               />
             </div>
-          </div>
-
-          <div className="flex space-x-4">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending Review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
+          )}
         </div>
-      </div>
 
-      {/* Videos Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVideos.map((video) => (
+        {/* Search Error Display */}
+        {searchError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <XCircle className="w-5 h-5 text-red-400 mr-2" />
+              <span className="text-red-800">{searchError}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Search Loading */}
+        {isSearching && (
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+            <span className="ml-3 text-gray-600">Searching videos...</span>
+          </div>
+        )}
+
+        {/* Enhanced Search Results */}
+        {useEnhancedSearch && searchResults && !isSearching && (
+          <SearchResultsDisplay
+            results={searchResults}
+            searchTerm={searchResults.query.term}
+            onItemClick={handleItemClick}
+            onFacetClick={handleFacetClick}
+            onBulkOperationsClick={handleBulkOperationsClick}
+            enableBulkSelection={true}
+            className="enhanced-search-results"
+          />
+        )}
+
+        {/* Bulk Operations Panel */}
+        {showBulkOperations && (
+          <BulkOperationsPanel
+            isOpen={showBulkOperations}
+            onClose={() => setShowBulkOperations(false)}
+          />
+        )}
+      </BulkSelectionProvider>
+
+      {/* Legacy Videos Grid (when not using enhanced search) */}
+      {!useEnhancedSearch && !isSearching && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredVideos.map((video) => (
           <div key={video.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="aspect-video bg-gray-100 relative cursor-pointer" onClick={() => {
               setSelectedVideo(video);
@@ -525,13 +670,13 @@ const VideoVerification: React.FC = () => {
 
               <div className="flex items-center space-x-2 text-xs text-gray-600 mb-2">
                 <User className="w-3 h-3" />
-                <span>{video.userDisplayName || 'Unknown User'}</span>
+                <span>{video.userName || 'Unknown User'}</span>
               </div>
 
-              {video.uploadedAt && (
+              {video.createdAt && (
                 <div className="flex items-center space-x-2 text-xs text-gray-500">
                   <Calendar className="w-3 h-3" />
-                  <span>{new Date(video.uploadedAt.toDate()).toLocaleDateString()}</span>
+                  <span>{new Date(typeof video.createdAt === 'string' ? video.createdAt : video.createdAt instanceof Date ? video.createdAt : video.createdAt.toDate()).toLocaleDateString()}</span>
                 </div>
               )}
 
@@ -562,11 +707,12 @@ const VideoVerification: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {filteredVideos.length === 0 && (
+      {!useEnhancedSearch && !isSearching && filteredVideos.length === 0 && (
         <div className="text-center py-12">
           <FileVideo className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No videos found</h3>

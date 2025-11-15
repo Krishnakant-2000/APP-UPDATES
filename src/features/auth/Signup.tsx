@@ -57,6 +57,26 @@ export default function Signup() {
 
     const userService = (await import('../../services/api/userService')).default;
 
+    // First, check if user profile exists and create if needed
+    try {
+      const existingProfile = await userService.getUserProfile(user.uid);
+
+      // If profile doesn't exist, create it with the selected role
+      if (!existingProfile) {
+        const selectedRole = (localStorage.getItem('selectedUserRole') || 'athlete') as any; // Cast to proper type
+        await userService.createUserProfile({
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || displayName,
+          photoURL: user.photoURL,
+          role: selectedRole
+        });
+        console.log('✅ User profile created during signup with role:', selectedRole);
+      }
+    } catch (err) {
+      console.error('Error checking or creating user profile:', err);
+    }
+
     // Check for coach professional details and save them
     const coachDetails = localStorage.getItem('coachProfessionalDetails');
     if (coachDetails) {

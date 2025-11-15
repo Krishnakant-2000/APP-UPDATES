@@ -1,52 +1,70 @@
-import React, { useEffect, useRef, useState, lazy, Suspense, RefObject } from 'react';
-import { Sun, Globe, Lock, FileText, LogOut, Settings } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Settings,
+  Sun,
+  Globe,
+  Lock,
+  FileText,
+  LogOut,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User } from 'firebase/auth';
-import SettingsMenuItem from './SettingsMenuItem';
 import ThemeToggle from '../ui/ThemeToggle';
 import LanguageSelector from '../forms/LanguageSelector';
+import Portal from '../ui/Portal';
 import './SettingsMenu.css';
-
-const ChangePasswordForm = lazy(() => import('./ChangePasswordForm'));
 
 interface SettingsMenuProps {
   isOpen: boolean;
   onClose: () => void;
   isGuest: boolean;
-  triggerButtonRef?: RefObject<HTMLButtonElement>;
+  triggerButtonRef?: React.RefObject<HTMLButtonElement>;
   currentUser?: User | null;
 }
 
-const SettingsMenu: React.FC<SettingsMenuProps> = ({ isOpen, onClose, isGuest, triggerButtonRef, currentUser }) => {
+const SettingsMenu: React.FC<SettingsMenuProps> = ({
+  isOpen,
+  onClose,
+  isGuest,
+  triggerButtonRef,
+  currentUser,
+}) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
-  const [showPasswordForm, setShowPasswordForm] = useState<boolean>(false);
-  const firstFocusableRef = useRef<HTMLElement | null>(null);
-  const lastFocusableRef = useRef<HTMLElement | null>(null);
+  const [animationState, setAnimationState] = useState<'entering' | 'entered' | 'exiting'>('entering');
 
+  // Close menu when clicking outside
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
       if (
         menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
+        !menuRef.current.contains(target) &&
         triggerButtonRef?.current &&
-        !triggerButtonRef.current.contains(event.target as Node)
+        !triggerButtonRef.current.contains(target)
       ) {
         onClose();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Add slight delay to avoid immediate closing
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
 
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onClose, triggerButtonRef]);
 
+  // Close menu on Escape key
   useEffect(() => {
     if (!isOpen) return;
 
@@ -57,85 +75,26 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ isOpen, onClose, isGuest, t
     };
 
     document.addEventListener('keydown', handleEscapeKey);
-
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKey);
-    };
+    return () => document.removeEventListener('keydown', handleEscapeKey);
   }, [isOpen, onClose]);
 
+  // Handle animation state when modal opens
   useEffect(() => {
-    if (!isOpen || !menuRef.current) return;
-
-    const focusTimeout = setTimeout(() => {
-      if (!menuRef.current) return;
-
-      const focusableElements = menuRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-
-      if (focusableElements.length === 0) return;
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      firstFocusableRef.current = firstElement;
-      lastFocusableRef.current = lastElement;
-
-      firstElement.focus();
-    }, 50);
-
-    const handleTabKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab' || !menuRef.current) return;
-
-      const focusableElements = menuRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-
-      if (focusableElements.length === 0) return;
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleTabKey);
-
-    return () => {
-      clearTimeout(focusTimeout);
-      document.removeEventListener('keydown', handleTabKey);
-    };
-  }, [isOpen, showPasswordForm]);
-
-  useEffect(() => {
-    if (!isOpen && triggerButtonRef?.current) {
-      triggerButtonRef.current.focus();
+    if (isOpen) {
+      // Start with entering state
+      setAnimationState('entering');
+      // Immediately transition to entered state to trigger smooth animation
+      const timer = setTimeout(() => {
+        setAnimationState('entered');
+      }, 10); // Small delay to ensure DOM is ready
+      
+      return () => clearTimeout(timer);
+    } else {
+      setAnimationState('entering'); // Reset for next open
     }
-  }, [isOpen, triggerButtonRef]);
+  }, [isOpen]);
 
-  const handlePasswordFormClose = () => {
-    setShowPasswordForm(false);
-  };
-
-  const handlePasswordChangeSuccess = () => {
-    setShowPasswordForm(false);
-  };
-
-  const handleChangePasswordClick = () => {
-    setShowPasswordForm(true);
-  };
-
-  const handlePrivacyPolicyClick = () => {
-    window.open('/privacy-policy.html', '_blank');
-  };
-
-  const handleSettingsPageClick = () => {
+  const handleNavigateToSettings = () => {
     onClose();
     navigate('/settings');
   };
@@ -146,87 +105,157 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ isOpen, onClose, isGuest, t
       onClose();
       navigate('/login');
     } catch (error) {
-      console.error('Failed to log out:', error);
+      // eslint-disable-next-line no-console
+      console.error('Logout failed:', error);
     }
+  };
+
+  const handlePrivacyPolicy = () => {
+    window.open('/privacy-policy.html', '_blank');
   };
 
   if (!isOpen) return null;
 
+  // Render modal to document body using Portal
   return (
-    <div
-      ref={menuRef}
-      className="settings-menu"
-      role="menu"
-      aria-label="Settings menu"
-    >
-      <div className="settings-menu-header">
-        <h3>Settings</h3>
-      </div>
-      <div className="settings-menu-content">
-        {!isGuest && (
-          <SettingsMenuItem
-            icon={Settings}
-            label="Account Settings"
-            onClick={handleSettingsPageClick}
-            showDivider={true}
-            ariaLabel="Go to account settings page"
-          />
-        )}
+    <Portal containerId="settings-modal-root">
+      {/* Dark Overlay */}
+      <div 
+        className={`settings-menu-overlay ${animationState}`} 
+        onClick={onClose} 
+      />
 
-        <SettingsMenuItem
-          icon={Sun}
-          label="Theme"
-          showDivider={true}
-          ariaLabel="Change theme"
+      {/* Modal Container */}
+      <div 
+        className={`settings-menu-modal ${animationState}`} 
+        ref={menuRef} 
+        role="dialog" 
+        aria-label="Settings menu"
+      >
+        {/* Close Button */}
+        <button
+          className="settings-menu-close-btn"
+          onClick={onClose}
+          aria-label="Close settings menu"
         >
-          <ThemeToggle inline={true} showLabel={false} />
-        </SettingsMenuItem>
+          <X size={24} />
+        </button>
 
-        <SettingsMenuItem
-          icon={Globe}
-          label="Language"
-          showDivider={!isGuest}
-          ariaLabel="Change language"
-        >
-          <LanguageSelector inline={true} showLabel={true} dropdownPosition="left" />
-        </SettingsMenuItem>
+        {/* Header */}
+        <div className="settings-menu-modal-header">
+          <Settings size={28} />
+          <h2>Settings</h2>
+        </div>
 
-        {!isGuest && (
-          <SettingsMenuItem
-            icon={Lock}
-            label="Change Password"
-            onClick={handleChangePasswordClick}
-            showDivider={true}
-            ariaLabel="Change password"
-          />
-        )}
+        {/* Content */}
+        <div className="settings-menu-modal-content">
+          {/* Account Settings - Authenticated users only */}
+          {!isGuest && (
+            <div className="settings-menu-section">
+              <button
+                className="settings-menu-option"
+                onClick={handleNavigateToSettings}
+              >
+                <div className="settings-option-icon">
+                  <Settings size={24} />
+                </div>
+                <div className="settings-option-text">
+                  <h3>Account Settings</h3>
+                  <p>Manage your profile and account information</p>
+                </div>
+              </button>
+            </div>
+          )}
 
-        <SettingsMenuItem
-          icon={FileText}
-          label="Privacy Policy"
-          onClick={handlePrivacyPolicyClick}
-          showDivider={true}
-          ariaLabel="View privacy policy"
-        />
+          {/* Theme Toggle */}
+          <div className="settings-menu-section">
+            <h4 className="settings-section-title">Appearance</h4>
+            <div className="settings-menu-option theme-option">
+              <div className="settings-option-icon">
+                <Sun size={24} />
+              </div>
+              <div className="settings-option-text">
+                <h3>Theme</h3>
+                <p>Choose your preferred color theme</p>
+              </div>
+              <div className="settings-option-control">
+                <ThemeToggle inline={true} showLabel={false} />
+              </div>
+            </div>
+          </div>
 
-        <SettingsMenuItem
-          icon={LogOut}
-          label={isGuest ? 'Sign In' : 'Logout'}
-          onClick={handleLogout}
-          showDivider={false}
-          ariaLabel={isGuest ? 'Sign in to your account' : 'Logout from your account'}
-        />
+          {/* Language Selector */}
+          <div className="settings-menu-section">
+            <h4 className="settings-section-title">Language</h4>
+            <div className="settings-menu-option language-option">
+              <div className="settings-option-icon">
+                <Globe size={24} />
+              </div>
+              <div className="settings-option-text">
+                <h3>Language</h3>
+                <p>Select your preferred language</p>
+              </div>
+              <div className="settings-option-control">
+                <LanguageSelector inline={true} showLabel={false} dropdownPosition="left" />
+              </div>
+            </div>
+          </div>
+
+          {/* Change Password - Authenticated users only */}
+          {!isGuest && (
+            <div className="settings-menu-section">
+              <button
+                className="settings-menu-option"
+                onClick={() => {
+                  onClose();
+                  navigate('/settings?tab=security');
+                }}
+              >
+                <div className="settings-option-icon">
+                  <Lock size={24} />
+                </div>
+                <div className="settings-option-text">
+                  <h3>Change Password</h3>
+                  <p>Update your account password</p>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Privacy Policy */}
+          <div className="settings-menu-section">
+            <button
+              className="settings-menu-option"
+              onClick={handlePrivacyPolicy}
+            >
+              <div className="settings-option-icon">
+                <FileText size={24} />
+              </div>
+              <div className="settings-option-text">
+                <h3>Privacy Policy</h3>
+                <p>Read our privacy and terms</p>
+              </div>
+            </button>
+          </div>
+
+          {/* Logout / Sign In */}
+          <div className="settings-menu-section logout-section">
+            <button
+              className="settings-menu-option logout-option"
+              onClick={handleLogout}
+            >
+              <div className="settings-option-icon">
+                <LogOut size={24} />
+              </div>
+              <div className="settings-option-text">
+                <h3>{isGuest ? 'Sign In' : 'Logout'}</h3>
+                <p>{isGuest ? 'Sign in to your account' : 'Sign out from your account'}</p>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
-
-      {showPasswordForm && !isGuest && (
-        <Suspense fallback={<div className="settings-loading">Loading...</div>}>
-          <ChangePasswordForm
-            onClose={handlePasswordFormClose}
-            onSuccess={handlePasswordChangeSuccess}
-          />
-        </Suspense>
-      )}
-    </div>
+    </Portal>
   );
 };
 

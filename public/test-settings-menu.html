@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings Menu Cross-Browser Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .browser-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .test-button:hover {
+            background: #0056b3;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        
+        .status-pass { color: #28a745; }
+        .status-fail { color: #dc3545; }
+        
+        .instructions {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Settings Menu Cross-Browser Test</h1>
+        
+        <div class="browser-info">
+            <h3>Browser Information</h3>
+            <div id="browser-details">Loading...</div>
+        </div>
+        
+        <div class="instructions">
+            <h3>Instructions</h3>
+            <ol>
+                <li>Open this page in different browsers (Chrome, Firefox, Safari, Edge)</li>
+                <li>Click "Run Tests" to automatically test settings menu functionality</li>
+                <li>Manually test the settings menu by clicking the settings button in your app</li>
+                <li>Compare results across browsers to identify compatibility issues</li>
+            </ol>
+        </div>
+        
+        <div class="test-section">
+            <h3>Automated Tests</h3>
+            <button class="test-button" onclick="runAutomatedTests()">Run Tests</button>
+            <button class="test-button" onclick="clearResults()">Clear Results</button>
+            <div id="test-results" class="results"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Manual Test Checklist</h3>
+            <div id="manual-checklist">
+                <h4>Desktop Tests</h4>
+                <label><input type="checkbox"> Settings menu opens when clicking settings button</label><br>
+                <label><input type="checkbox"> All menu items are visible (Account Settings, Theme, Language, etc.)</label><br>
+                <label><input type="checkbox"> Theme toggle shows light/dark mode buttons</label><br>
+                <label><input type="checkbox"> Language selector opens dropdown with language options</label><br>
+                <label><input type="checkbox"> All menu items are clickable and functional</label><br>
+                <label><input type="checkbox"> Menu closes when clicking outside</label><br>
+                <label><input type="checkbox"> Keyboard navigation works (Tab, Enter, Escape)</label><br>
+                <label><input type="checkbox"> Menu is properly positioned and not cut off</label><br>
+                <label><input type="checkbox"> No console errors when using the menu</label><br>
+                
+                <h4>Mobile/Tablet Tests</h4>
+                <label><input type="checkbox"> Menu fits within mobile viewport (no horizontal scrolling)</label><br>
+                <label><input type="checkbox"> Touch targets are large enough (44px+ height)</label><br>
+                <label><input type="checkbox"> Menu positioning adapts to mobile (fixed/full-width)</label><br>
+                <label><input type="checkbox"> Touch interactions work smoothly (tap, scroll)</label><br>
+                <label><input type="checkbox"> Menu works in both portrait and landscape orientations</label><br>
+                <label><input type="checkbox"> No zoom issues when interacting with menu items</label><br>
+                <label><input type="checkbox"> Menu doesn't interfere with mobile browser UI</label><br>
+                <label><input type="checkbox"> Scrolling works properly within menu on mobile</label><br>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>CSS Feature Support</h3>
+            <div id="css-support">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        // Browser detection
+        function detectBrowser() {
+            const userAgent = navigator.userAgent;
+            let browser = 'Unknown';
+            let version = 'Unknown';
+            
+            if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) {
+                browser = 'Chrome';
+                const match = userAgent.match(/Chrome\/(\d+)/);
+                version = match ? match[1] : 'Unknown';
+            } else if (userAgent.includes('Firefox')) {
+                browser = 'Firefox';
+                const match = userAgent.match(/Firefox\/(\d+)/);
+                version = match ? match[1] : 'Unknown';
+            } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+                browser = 'Safari';
+                const match = userAgent.match(/Version\/(\d+)/);
+                version = match ? match[1] : 'Unknown';
+            } else if (userAgent.includes('Edg')) {
+                browser = 'Edge';
+                const match = userAgent.match(/Edg\/(\d+)/);
+                version = match ? match[1] : 'Unknown';
+            }
+            
+            return { browser, version, userAgent };
+        }
+        
+        // CSS feature detection
+        function checkCSSSupport() {
+            const features = {
+                'CSS Grid': CSS.supports('display', 'grid'),
+                'Flexbox': CSS.supports('display', 'flex'),
+                'Custom Properties': CSS.supports('--test', 'value'),
+                'Backdrop Filter': CSS.supports('backdrop-filter', 'blur(10px)'),
+                'Transform': CSS.supports('transform', 'translateZ(0)'),
+                'Transition': CSS.supports('transition', 'all 0.3s ease')
+            };
+            
+            return features;
+        }
+        
+        // Mobile device detection
+        function detectMobileDevice() {
+            const userAgent = navigator.userAgent;
+            const isMobile = /Mobi|Android/i.test(userAgent);
+            const isTablet = /iPad|Android(?!.*Mobile)/i.test(userAgent) || 
+                           (window.innerWidth >= 768 && window.innerWidth <= 1024);
+            const isPhone = isMobile && !isTablet;
+            
+            const orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+            
+            let screenSize = 'large';
+            if (window.innerWidth <= 480) {
+                screenSize = 'small';
+            } else if (window.innerWidth <= 768) {
+                screenSize = 'medium';
+            }
+            
+            const touchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            
+            return {
+                isMobile,
+                isTablet,
+                isPhone,
+                orientation,
+                screenSize,
+                touchSupport
+            };
+        }
+        
+        // Display browser info
+        function displayBrowserInfo() {
+            const info = detectBrowser();
+            const mobile = detectMobileDevice();
+            const cssSupport = checkCSSSupport();
+            
+            const deviceType = mobile.isPhone ? 'Phone' : mobile.isTablet ? 'Tablet' : 'Desktop';
+            
+            document.getElementById('browser-details').innerHTML = `
+                <strong>Browser:</strong> ${info.browser} ${info.version}<br>
+                <strong>Device Type:</strong> ${deviceType} (${mobile.screenSize} screen)<br>
+                <strong>Orientation:</strong> ${mobile.orientation}<br>
+                <strong>Touch Support:</strong> ${mobile.touchSupport ? 'Yes' : 'No'}<br>
+                <strong>Viewport:</strong> ${window.innerWidth} x ${window.innerHeight}<br>
+                <strong>Device Pixel Ratio:</strong> ${window.devicePixelRatio}<br>
+                <strong>User Agent:</strong> ${info.userAgent}
+            `;
+            
+            const supportHtml = Object.entries(cssSupport)
+                .map(([feature, supported]) => 
+                    `<span class="${supported ? 'status-pass' : 'status-fail'}">${feature}: ${supported ? '✅' : '❌'}</span>`
+                ).join('<br>');
+            
+            document.getElementById('css-support').innerHTML = supportHtml;
+        }
+        
+        // Run automated tests
+        async function runAutomatedTests() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = 'Running tests...\n';
+            
+            const info = detectBrowser();
+            let results = `Cross-Browser Test Results for ${info.browser} ${info.version}\n`;
+            results += `${'='.repeat(50)}\n\n`;
+            
+            // Test 1: Check if we're in the main app
+            const isInApp = window.location.href.includes('localhost:3000') || 
+                           window.location.href.includes('your-app-domain.com');
+            
+            if (!isInApp) {
+                results += '❌ Not running in main app - navigate to your app to test settings menu\n';
+                results += 'ℹ️  Open your React app and then run these tests\n\n';
+            } else {
+                results += '✅ Running in main app environment\n\n';
+            }
+            
+            // Test 2: Check for React app elements
+            const hasReactRoot = document.getElementById('root') !== null;
+            results += `${hasReactRoot ? '✅' : '❌'} React root element found: ${hasReactRoot}\n`;
+            
+            // Test 3: Check for settings menu in DOM
+            const settingsMenu = document.querySelector('.settings-menu');
+            results += `${settingsMenu ? '✅' : '❌'} Settings menu element found: ${!!settingsMenu}\n`;
+            
+            if (settingsMenu) {
+                const computedStyle = window.getComputedStyle(settingsMenu);
+                const isVisible = computedStyle.display !== 'none' && 
+                                 computedStyle.visibility !== 'hidden';
+                results += `${isVisible ? '✅' : '❌'} Settings menu visible: ${isVisible}\n`;
+            }
+            
+            // Test 4: Check for theme toggle
+            const themeToggle = document.querySelector('.theme-toggle-inline-container');
+            results += `${themeToggle ? '✅' : '❌'} Theme toggle found: ${!!themeToggle}\n`;
+            
+            // Test 5: Check for language selector
+            const languageSelector = document.querySelector('.language-selector');
+            results += `${languageSelector ? '✅' : '❌'} Language selector found: ${!!languageSelector}\n`;
+            
+            // Test 6: Console error check
+            let hasConsoleErrors = false;
+            const originalError = console.error;
+            console.error = (...args) => {
+                hasConsoleErrors = true;
+                originalError.apply(console, args);
+            };
+            
+            setTimeout(() => {
+                console.error = originalError;
+                results += `${!hasConsoleErrors ? '✅' : '❌'} No console errors: ${!hasConsoleErrors}\n`;
+            }, 1000);
+            
+            results += '\n📋 Manual Testing Required:\n';
+            results += '• Open settings menu in your app\n';
+            results += '• Test theme switching\n';
+            results += '• Test language selection\n';
+            results += '• Test menu item clicks\n';
+            results += '• Test keyboard navigation (desktop)\n';
+            results += '• Test touch interactions (mobile)\n';
+            results += '• Test responsive behavior\n';
+            results += '• Test orientation changes (mobile)\n';
+            results += '• Test viewport fit on different screen sizes\n';
+            
+            resultsDiv.innerHTML = results;
+        }
+        
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+        }
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            displayBrowserInfo();
+            
+            // Update browser info on resize
+            window.addEventListener('resize', displayBrowserInfo);
+        });
+    </script>
+</body>
+</html>

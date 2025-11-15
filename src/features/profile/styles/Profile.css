@@ -420,6 +420,146 @@
   box-shadow: 0 2px 6px rgba(32, 178, 170, 0.25);
 }
 
+/* Profile Action Buttons Container - Flexbox layout for follow, message, connect buttons */
+.profile-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 16px;
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .profile-action-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+}
+
+@media (min-width: 768px) {
+  .profile-action-buttons {
+    gap: 14px;
+  }
+}
+
+/* Message Button and Connect Button Styles */
+.message-btn,
+.connect-btn,
+.pending-btn,
+.add-friend-btn {
+  background: linear-gradient(135deg, #007AFF 0%, #0051D5 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 44px;
+  min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+  .message-btn,
+  .connect-btn,
+  .pending-btn,
+  .add-friend-btn {
+    padding: 14px 32px;
+    font-size: 16px;
+    min-width: 140px;
+    border-radius: 10px;
+  }
+}
+
+.message-btn:hover,
+.connect-btn:hover {
+  background: linear-gradient(135deg, #0051D5 0%, #003BA3 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.35);
+}
+
+.message-btn:active,
+.connect-btn:active {
+  background: linear-gradient(135deg, #003BA3 0%, #002E7F 100%);
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.25);
+}
+
+/* Disabled state for message and connect buttons */
+.message-btn:disabled,
+.connect-btn:disabled {
+  background: linear-gradient(135deg, #B3D9FF 0%, #89BFFF 100%);
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.message-btn:disabled:hover,
+.connect-btn:disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.15);
+}
+
+/* Pending Button - Disabled state */
+.pending-btn {
+  background: linear-gradient(135deg, #FFB74D 0%, #FFA726 100%);
+  cursor: not-allowed;
+  opacity: 0.8;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.2);
+}
+
+.pending-btn:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.2);
+}
+
+/* Add Friend Button - Disabled state */
+.add-friend-btn {
+  background: linear-gradient(135deg, #999999 0%, #777777 100%);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.add-friend-btn:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Error message styling */
+.message-btn-error {
+  color: #d32f2f;
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px;
+  background: #ffebee;
+  border-radius: 4px;
+  border-left: 3px solid #d32f2f;
+}
+
+/* Spinning animation for loading states */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Bottom Navigation Styles - Enhanced responsive design */
 .bottom-navigation {
   position: fixed;

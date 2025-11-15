@@ -103,17 +103,17 @@ service cloud.firestore {
     // Friend requests collection
     match /friendRequests/{requestId} {
       allow read: if request.auth != null && (
-        request.auth.uid == resource.data.senderId ||
-        request.auth.uid == resource.data.receiverId
+        request.auth.uid == resource.data.requesterId ||
+        request.auth.uid == resource.data.recipientId
       );
       allow create: if request.auth != null && !isGuestUser() && validateFriendRequestData();
       allow update: if request.auth != null && !isGuestUser() && (
-        request.auth.uid == resource.data.receiverId ||
-        request.auth.uid == resource.data.senderId
+        request.auth.uid == resource.data.recipientId ||
+        request.auth.uid == resource.data.requesterId
       );
       allow delete: if request.auth != null && !isGuestUser() && (
-        request.auth.uid == resource.data.senderId ||
-        request.auth.uid == resource.data.receiverId
+        request.auth.uid == resource.data.requesterId ||
+        request.auth.uid == resource.data.recipientId
       );
     }
     
@@ -148,12 +148,12 @@ service cloud.firestore {
     }
     
     function validateFriendRequestData() {
-      return request.resource.data.keys().hasAll(['senderId', 'receiverId', 'senderName', 'status', 'timestamp'])
-        && request.resource.data.senderId is string
-        && request.resource.data.receiverId is string
-        && request.resource.data.senderName is string
+      return request.resource.data.keys().hasAll(['requesterId', 'recipientId', 'requesterName', 'status', 'timestamp'])
+        && request.resource.data.requesterId is string
+        && request.resource.data.recipientId is string
+        && request.resource.data.requesterName is string
         && request.resource.data.status in ['pending', 'accepted', 'rejected']
-        && request.resource.data.senderId == request.auth.uid;
+        && request.resource.data.requesterId == request.auth.uid;
     }
     
     function validateMessageData() {
@@ -673,6 +673,55 @@ service cloud.firestore {
       return affectedKeys.hasOnly(['engagement', 'updatedAt']) ||
              affectedKeys.hasOnly(['engagement']) ||
              affectedKeys.hasOnly(['updatedAt']);
+    }
+
+    // Organization Connection Requests collection - for admin approval of org-athlete connections
+    match /organizationConnectionRequests/{requestId} {
+      // Admins can read all requests; users can read requests involving them
+      allow read: if request.auth != null && (
+        isAdminUser() ||
+        request.auth.uid == resource.data.organizationId ||
+        request.auth.uid == resource.data.athleteId
+      );
+
+      // Authenticated users can create requests, but only admins can update/delete
+      allow create: if request.auth != null && !isGuestUser() && validateOrgConnectionData();
+
+      // Only admins can update connection requests (approve/reject)
+      allow update: if request.auth != null && isAdminUser();
+
+      // Only admins can delete connection requests
+      allow delete: if request.auth != null && isAdminUser();
+    }
+
+    // Connection Interactions collection - for tracking org-athlete interactions
+    match /connectionInteractions/{interactionId} {
+      // Only admins can read and write connection interactions
+      allow read, write: if request.auth != null && isAdminUser();
+    }
+
+    function validateOrgConnectionData() {
+      return request.resource.data.keys().hasAll(['organizationId', 'organizationName', 'athleteId', 'athleteName', 'status', 'requestDate'])
+        && request.resource.data.organizationId is string
+        && request.resource.data.organizationName is string
+        && request.resource.data.athleteId is string
+        && request.resource.data.athleteName is string
+        && request.resource.data.status in ['pending', 'approved', 'rejected']
+        && request.resource.data.requestDate != null;
+    }
+
+    // Update Notifications to allow admin writes for connection notifications
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId ||
+        (resource.data.relatedUserId != null && request.auth.uid == resource.data.relatedUserId)
+      );
+      allow create: if request.auth != null && (
+        (!isGuestUser() && validateNotificationData()) ||
+        (isAdminUser()) // Admins can create notifications for system events
+      );
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
   }
 }

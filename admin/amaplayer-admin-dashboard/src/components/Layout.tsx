@@ -1,15 +1,16 @@
 import React, { ReactNode, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  PlayCircle, 
-  LogOut, 
-  Menu, 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  PlayCircle,
+  LogOut,
+  Menu,
   X,
-  Shield
+  Shield,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -50,6 +51,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       name: 'Video Verification',
       href: '/videos',
       icon: PlayCircle,
+    },
+    {
+      name: 'Connection Requests',
+      href: '/connections',
+      icon: LinkIcon,
     },
   ];
 

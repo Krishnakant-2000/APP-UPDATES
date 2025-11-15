@@ -141,6 +141,54 @@ class EventsService {
       throw error;
     }
   }
+
+  // Bulk activate events
+  async bulkActivateEvents(eventIds: string[], reason?: string): Promise<{ processedCount: number; failedCount: number; errors: Array<{ eventId: string; error: string }> }> {
+    const result = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: [] as Array<{ eventId: string; error: string }>
+    };
+
+    for (const eventId of eventIds) {
+      try {
+        await this.toggleEventStatus(eventId, true);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          eventId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  // Bulk deactivate events
+  async bulkDeactivateEvents(eventIds: string[], reason?: string): Promise<{ processedCount: number; failedCount: number; errors: Array<{ eventId: string; error: string }> }> {
+    const result = {
+      processedCount: 0,
+      failedCount: 0,
+      errors: [] as Array<{ eventId: string; error: string }>
+    };
+
+    for (const eventId of eventIds) {
+      try {
+        await this.toggleEventStatus(eventId, false);
+        result.processedCount++;
+      } catch (error) {
+        result.failedCount++;
+        result.errors.push({
+          eventId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return result;
+  }
 }
 
 export const eventsService = new EventsService();

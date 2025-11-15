@@ -120,13 +120,21 @@ const TrackBestSection: React.FC<TrackBestSectionProps> = ({
             <div className="metrics-grid">
               {Object.entries(sportFields).map(([key, field]) => (
                 field.value && (
-                  <div key={key} className="metric-card">
+                  <div key={key} className="metric-card track-best-metric-card">
                     <div className="metric-icon">
                       <Trophy size={20} />
                     </div>
                     <div className="metric-content">
-                      <span className="metric-label">{field.label}</span>
-                      <span className="metric-value">
+                      <span 
+                        className="metric-label"
+                        style={{ color: '#374151', fontWeight: '600' }}
+                      >
+                        {field.label}
+                      </span>
+                      <span 
+                        className="metric-value"
+                        style={{ color: '#111827', fontWeight: '700', fontSize: '20px' }}
+                      >
                         {field.value} {field.unit}
                       </span>
                     </div>

@@ -1,11 +1,12 @@
 /* Track Best Section Styles */
 .track-best-section {
-  background: white;
+  background: #ffffff !important;
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
-  border: 1px solid #e5e7eb;
+  border: 2px solid #e5e7eb;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .track-best-section:hover {
@@ -119,30 +120,34 @@
 }
 
 .metric-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   padding: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .metric-card:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: #ffffff;
+  border-color: #f59e0b;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .metric-icon {
-  width: 40px;
-  height: 40px;
-  background: #fef3c7;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #d97706;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
 }
 
 .metric-content {
@@ -154,16 +159,17 @@
 
 .metric-label {
   font-size: 12px;
-  font-weight: 500;
-  color: #6b7280;
+  font-weight: 600;
+  color: #374151;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .metric-value {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: #111827;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Match Information */
@@ -273,4 +279,89 @@
   .metric-content {
     align-items: center;
   }
+}
+/* The
+me Support for Better Visibility */
+[data-theme="light"] .metric-card,
+.metric-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .metric-value,
+.metric-value {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .metric-label,
+.metric-label {
+  color: #374151 !important;
+}
+
+[data-theme="dark"] .metric-card {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+[data-theme="dark"] .metric-value {
+  color: #f9fafb !important;
+}
+
+[data-theme="dark"] .metric-label {
+  color: #d1d5db !important;
+}
+
+/* High contrast overlay for maximum visibility */
+.track-best-section .metric-card {
+  position: relative;
+  backdrop-filter: blur(1px);
+}
+
+.track-best-section .metric-value {
+  position: relative;
+  z-index: 2;
+}
+
+.track-best-section .metric-label {
+  position: relative;
+  z-index: 2;
+}
+
+/* Force visibility on white backgrounds */
+body[style*="background: white"] .metric-value,
+body[style*="background-color: white"] .metric-value,
+.theme-light .metric-value {
+  color: #000000 !important;
+  font-weight: 800 !important;
+}
+
+body[style*="background: white"] .metric-label,
+body[style*="background-color: white"] .metric-label,
+.theme-light .metric-label {
+  color: #374151 !important;
+  font-weight: 600 !important;
+}/* S
+pecific class for track best metrics with maximum visibility */
+.track-best-metric-card {
+  background: #ffffff !important;
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.track-best-metric-card .metric-value {
+  color: #000000 !important;
+  font-weight: 800 !important;
+  font-size: 20px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.track-best-metric-card .metric-label {
+  color: #374151 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+}
+
+.track-best-metric-card:hover {
+  border-color: #d97706 !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3) !important;
 }
