@@ -110,6 +110,36 @@
   font-size: 8px;
 }
 
+/* Unread message indicator */
+.unread-message-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  background: #ff4757;
+  border: 2px solid var(--bg-card);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 8px;
+  box-shadow: 0 0 8px rgba(255, 71, 87, 0.6);
+  animation: pulse-unread 2s infinite;
+}
+
+@keyframes pulse-unread {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(255, 71, 87, 0.6);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(255, 71, 87, 0.8);
+  }
+}
+
 /* Friend Info */
 .friend-info-enhanced {
   flex: 1;

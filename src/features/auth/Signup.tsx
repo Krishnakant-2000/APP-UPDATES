@@ -108,6 +108,61 @@ export default function Signup() {
       return; // Exit early if we processed coach details
     }
 
+    // Check for organization details and save them
+    const orgDetails = localStorage.getItem('organizationDetails');
+    if (orgDetails) {
+      try {
+        const details = JSON.parse(orgDetails);
+
+        // Build organization profile data object
+        const profileData: any = {
+          displayName: details.organizationName || '',
+          userRole: 'organization',
+          email: details.email || user.email,
+          // Basic Info
+          organizationType: details.organizationType || '',
+          establishedYear: details.establishedYear || '',
+          registrationNumber: details.registrationNumber || '',
+          // Contact Details
+          contactPersonName: details.contactPersonName || '',
+          designation: details.designation || '',
+          mobile: details.phone || '',
+          alternatePhone: details.alternatePhone || '',
+          website: details.website || '',
+          // Address
+          street: details.street || '',
+          city: details.city || '',
+          state: details.state || '',
+          pincode: details.pincode || '',
+          country: details.country || 'India',
+          // Sports & Players
+          sportsOffered: details.sportsOffered || [],
+          sports: details.sportsOffered || [], // Also save as sports for compatibility
+          numberOfPlayers: details.numberOfPlayers || '',
+          ageGroups: details.ageGroups || [],
+          // Facilities
+          facilities: {
+            trainingGrounds: details.hasTrainingGrounds || false,
+            gym: details.hasGym || false,
+            coachingStaff: details.hasCoachingStaff || false,
+            hostel: details.hasHostel || false
+          },
+          // Additional Info
+          achievements: details.achievements || '',
+          specialNotes: details.specialNotes || '',
+          bio: details.achievements || '' // Use achievements as bio for display
+        };
+
+        await userService.updateUserProfile(user.uid, profileData);
+
+        localStorage.removeItem('organizationDetails');
+        console.log('✅ Organization details saved after signup');
+      } catch (err) {
+        console.error('Error saving organization details:', err);
+      }
+      return; // Exit early if we processed organization details
+    }
+
     // Check for pending athlete profile and save it
     const pendingAthleteProfile = localStorage.getItem('pendingAthleteProfile');
     if (pendingAthleteProfile) {

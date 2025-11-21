@@ -149,6 +149,11 @@ const PersonalDetailsModal: React.FC<PersonalDetailsModalProps> = ({
   };
 
   const getFieldLabel = (field: string): string => {
+    // Special handling for organization-specific labels
+    if (field === 'dateOfBirth' && currentRole === 'organization') {
+      return 'Established Year';
+    }
+
     const labels: Record<string, string> = {
       name: 'Name',
       dateOfBirth: 'Date of Birth',
@@ -172,11 +177,19 @@ const PersonalDetailsModal: React.FC<PersonalDetailsModalProps> = ({
       yearsExperience: 'Years of Experience',
       coachingLevel: 'Coaching Level'
     };
-    
+
     return labels[field] || field.charAt(0).toUpperCase() + field.slice(1);
   };
 
   const getFieldPlaceholder = (field: string): string => {
+    // Special handling for organization-specific placeholders
+    if (field === 'dateOfBirth' && currentRole === 'organization') {
+      return 'e.g., 2010';
+    }
+    if (field === 'name' && currentRole === 'organization') {
+      return 'Enter organization name';
+    }
+
     const placeholders: Record<string, string> = {
       name: 'Enter your full name',
       dateOfBirth: 'YYYY-MM-DD',
@@ -317,6 +330,19 @@ const PersonalDetailsModal: React.FC<PersonalDetailsModalProps> = ({
         );
       
       case 'dateOfBirth':
+        // For organizations, show a year input instead of date picker
+        if (currentRole === 'organization') {
+          return (
+            <input
+              {...commonProps}
+              type="number"
+              min="1900"
+              max={new Date().getFullYear()}
+              placeholder={getFieldPlaceholder(field)}
+              value={String(value || '')}
+            />
+          );
+        }
         return (
           <input
             {...commonProps}

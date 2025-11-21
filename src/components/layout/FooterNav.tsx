@@ -1,6 +1,9 @@
-import  { memo, useEffect } from 'react';
+import  { memo, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, Play, Calendar, MessageCircle, User, LucideIcon } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { db } from '../../lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import './FooterNav.css';
 
 interface NavItem {
@@ -13,6 +16,32 @@ interface NavItem {
 const FooterNav = memo(function FooterNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser, isGuest } = useAuth();
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
+
+  // Listen for unread messages
+  useEffect(() => {
+    if (!currentUser || isGuest()) {
+      setUnreadMessageCount(0);
+      return;
+    }
+
+    const messagesRef = collection(db, 'messages');
+    const q = query(
+      messagesRef,
+      where('receiverId', '==', currentUser.uid),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUnreadMessageCount(snapshot.size);
+    }, (error) => {
+      console.error('Error fetching unread messages:', error);
+      setUnreadMessageCount(0);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, isGuest]);
 
   // Preload critical routes on component mount
   useEffect(() => {
@@ -111,6 +140,9 @@ const FooterNav = memo(function FooterNav() {
           >
             <span className="footer-nav-icon">
               <item.icon size={24} />
+              {item.id === 'messages' && unreadMessageCount > 0 && (
+                <span className="unread-message-dot" aria-label={`${unreadMessageCount} unread messages`} />
+              )}
             </span>
             <span className="footer-nav-label">{item.label}</span>
           </button>

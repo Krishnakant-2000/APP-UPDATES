@@ -22,6 +22,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import userService from '../../../services/api/userService';
 import '../styles/Profile.css';
 import '../styles/ProfileEnhanced.css';
+import { getPrivateEmail, getPrivatePhone } from '../../../utils/privacy/privacyUtils';
 
 const ProfileEnhanced: React.FC = () => {
   const navigate = useNavigate();

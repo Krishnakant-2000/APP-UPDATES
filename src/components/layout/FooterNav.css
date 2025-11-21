@@ -99,6 +99,32 @@
   font-size: 24px;
   margin-bottom: 4px;
   transition: transform 0.3s ease;
+  position: relative;
+}
+
+/* Unread message indicator dot */
+.unread-message-dot {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  width: 10px;
+  height: 10px;
+  background: #ff4757;
+  border-radius: 50%;
+  border: 2px solid var(--glass-bg, #1a1a2e);
+  box-shadow: 0 0 8px rgba(255, 71, 87, 0.6);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(255, 71, 87, 0.6);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(255, 71, 87, 0.8);
+  }
 }
 
 .footer-nav-label {

@@ -164,7 +164,7 @@ export const roleConfigurations: Record<UserRole, RoleConfig> = {
   organization: {
     role: 'organization',
     sections: ['personal', 'organizationInfo', 'certificates', 'posts'],
-    editableFields: ['name', 'dateOfBirth', 'gender', 'mobile', 'email', 'city', 'state', 'country'],
+    editableFields: ['name', 'dateOfBirth', 'mobile', 'email', 'city', 'state', 'country'],
     displayName: 'Organization'
   },
   parents: {

@@ -39,6 +39,7 @@ import AchievementsCertificatesSection from '../components/AchievementsCertifica
 import MessageButton from '../components/MessageButton';
 import { organizationConnectionService } from '../../../services/api/organizationConnectionService';
 import '../styles/Profile.css';
+import { getPrivateEmail, getPrivatePhone } from '../../../utils/privacy/privacyUtils';
 
 // Lazy load heavy components for better performance
 const TalentVideosSection = lazy(() => import('../components/TalentVideosSection'));
@@ -294,8 +295,8 @@ const Profile: React.FC = React.memo(() => {
             setCoverPhoto(userData.coverPhoto || null);
             setAthleteSports(userData.sportDetails || []);
 
-            // Load saved role from Firestore if it exists (for profile owner only)
-            if (isOwner && userData.role) {
+            // Load saved role from Firestore for all viewers
+            if (userData.role) {
               setCurrentRole(userData.role as UserRole);
             }
 
@@ -1678,11 +1679,15 @@ const Profile: React.FC = React.memo(() => {
             </div>
             <div className="field-row">
               <span className="field-label" id="mobile-label">MOBILE</span>
-              <span className="field-value" aria-labelledby="mobile-label">{personalDetails.mobile || 'Not specified'}</span>
+              <span className="field-value" aria-labelledby="mobile-label">
+                {getPrivatePhone(personalDetails.mobile, isOwner, currentRole)}
+              </span>
             </div>
             <div className="field-row">
               <span className="field-label" id="email-label">EMAIL</span>
-              <span className="field-value" aria-labelledby="email-label">{personalDetails.email || 'Not specified'}</span>
+              <span className="field-value" aria-labelledby="email-label">
+                {getPrivateEmail(personalDetails.email, isOwner, currentRole)}
+              </span>
             </div>
             <div className="field-row">
               <span className="field-label" id="city-label">CITY</span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
@@ -90,6 +90,19 @@ export default function Messages() {
   const [followingUser, setFollowingUser] = useState<string | null>(null);
   const [sendButtonError, setSendButtonError] = useState<boolean>(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState<boolean>(false);
+
+  // Compute which friends have sent unread messages
+  const unreadFromFriends = useMemo(() => {
+    if (!currentUser) return new Set<string>();
+
+    const unreadSenders = new Set<string>();
+    messages.forEach(message => {
+      if (message.receiverId === currentUser.uid && !message.read) {
+        unreadSenders.add(message.senderId);
+      }
+    });
+    return unreadSenders;
+  }, [messages, currentUser]);
 
   useEffect(() => {
     console.log('📱 Messages: Initializing component', { currentUser: !!currentUser, isGuest: isGuest() });
@@ -366,6 +379,41 @@ export default function Messages() {
   // Notifications functionality moved to NavigationBar
 
   // Notification functions moved to NavigationBar
+
+  // Mark messages as read when opening a chat
+  const markMessagesAsRead = async (friendId: string) => {
+    if (!currentUser) return;
+
+    try {
+      // Find all unread messages from this friend
+      const unreadMessages = messages.filter(
+        msg => msg.senderId === friendId &&
+               msg.receiverId === currentUser.uid &&
+               !msg.read
+      );
+
+      // Mark each message as read
+      for (const message of unreadMessages) {
+        await updateDoc(doc(db, 'messages', message.id), {
+          read: true
+        });
+      }
+
+      if (unreadMessages.length > 0) {
+        console.log(`📱 Marked ${unreadMessages.length} messages as read from ${friendId}`);
+      }
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
+
+  // Mark messages as read when selecting a chat
+  useEffect(() => {
+    if (selectedChat) {
+      markMessagesAsRead(selectedChat.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat?.id]);
 
   const handleAcceptRequest = async (requestId: string, senderId: string): Promise<void> => {
     if (isGuest()) {
@@ -1025,6 +1073,7 @@ export default function Messages() {
                 friends={friends}
                 onSelectFriend={setSelectedChat}
                 loading={loading}
+                unreadFromFriends={unreadFromFriends}
               />
             )}
 

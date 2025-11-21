@@ -18,9 +18,10 @@ interface FriendsListProps {
   friends: Friend[];
   onSelectFriend: (friend: Friend) => void;
   loading?: boolean;
+  unreadFromFriends?: Set<string>; // Set of friend IDs who have sent unread messages
 }
 
-export default function FriendsList({ friends, onSelectFriend, loading }: FriendsListProps) {
+export default function FriendsList({ friends, onSelectFriend, loading, unreadFromFriends = new Set() }: FriendsListProps) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
 
@@ -85,8 +86,8 @@ export default function FriendsList({ friends, onSelectFriend, loading }: Friend
             aria-label={`Start chat with ${friend.displayName || 'Anonymous User'}`}
           >
             <div className="friend-avatar-container">
-              <SafeImage 
-                src={friend.photoURL || ''} 
+              <SafeImage
+                src={friend.photoURL || ''}
                 alt={friend.displayName || 'Anonymous User'}
                 placeholder="avatar"
                 className="friend-avatar-enhanced"
@@ -95,6 +96,11 @@ export default function FriendsList({ friends, onSelectFriend, loading }: Friend
               {friend.isOnline && (
                 <div className="online-status-indicator" aria-label="Online">
                   <Circle size={8} fill="currentColor" />
+                </div>
+              )}
+              {unreadFromFriends.has(friend.id) && (
+                <div className="unread-message-indicator" aria-label="Unread messages">
+                  <Circle size={10} fill="currentColor" />
                 </div>
               )}
             </div>
